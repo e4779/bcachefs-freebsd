@@ -6,7 +6,7 @@
 
 | Гейт | Условие | Статус
 |---|---|---|
-| G0 | `tools/bcachefs version` на FreeBSD | ⏳ Run 20 (все 21 патч применены)
+| G0 | `tools/bcachefs version` на FreeBSD | ⏳ Run 20: 93→23 ошибок; fix-round3 закрывает остаток
 | G1 | format→fsck→fill→verify на тест-образе | ожидает G0
 | G2 | FUSE rw тест-ФС + pjdfstest | ожидает G1
 | G3 | метаданные лучше 12.8 мс/файл моста | ожидает G2
