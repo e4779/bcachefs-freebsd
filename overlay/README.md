@@ -64,3 +64,11 @@ Linux build takes from glibc/UAPI); modifications of upstream files are
 | `patches/027-mount-legacy-freebsd.patch` | patch | mount.rs: MS_* shims; 4-arg MNT_* mount(2) arm (kernel mount → honest ENODEV) |
 | `patches/028-copy-fs-freebsd.patch` | patch | copy_fs: llistxattr/lgetxattr→extattr, mode_t u16 casts, no O_NOATIME, syncfs→fsync |
 | `patches/029-util-statx-freebsd.patch` | patch | util.rs path_subvol → None (STATX_SUBVOL is a Linux statx extension) |
+| `patches/030-attr-rustix-statat.patch` | patch | attr.rs: rustix::fs::fstatat → statat (fstatat is only a doc alias in rustix 1.1.4) |
+| `patches/031-fusemount-xattr-replace-freebsd.patch` | patch | fusemount.rs: XATTR_REPLACE from bsd_compat (libc crate: linux_like only) |
+| `patches/032-fusemount-mode-width-freebsd.patch` | patch | fusemount.rs: mode_t u16 — from_raw_mode shadow-cast, S_IFMT/S_IFDIR widened |
+| `patches/033-fusemount-rename-flags-freebsd.patch` | patch | fusemount.rs: RENAME_WHITEOUT/EXCHANGE/NOREPLACE are fuser Linux-only cfg arms |
+| `patches/034-fusemount-statfs-cchar-freebsd.patch` | patch | fusemount.rs: getmntinfo name() closure takes &[c_char] ([i8;N] fields) |
+| `patches/035-migrate-openopts-shadow.patch` | patch | migrate.rs: rename local OpenOptions fs_opts→open_opts (shadowed the bch_opts param) |
+| `patches/036-mount-dataptr-type-freebsd.patch` | patch | mount.rs: data_ptr gets explicit *const c_void (FreeBSD arm casts only) |
+| `patches/037-fs-context-syscall-cint.patch` | patch | fs_context.rs: SYS_* placeholders c_long→c_int (FreeBSD libc::syscall takes c_int) |

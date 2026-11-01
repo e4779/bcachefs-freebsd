@@ -81,6 +81,30 @@ should keep PKG_CONFIG_PATH pointing at it in future runs.
 - rustix 1.1.4 probed: Errno::NOATTR exists (libc backend); fstatat/fstat/
   fsync exist on FreeBSD backend.
 
+## Run 20 follow-ups (round 3, 23 errors → patches 030-037)
+
+Run 20 (all patches through 029 + fuser-porter's work) left 23 Rust errors.
+All are follow-ons of round-2 patches except four upstream misses in
+fusemount.rs. Fixes are patches 030-037; each dry-run-verified against a
+copy of the current tools/ state (cumulative stages for fusemount.rs).
+
+| Patch | File(s) | Error(s) | Fix |
+|---|---|---|---|
+| 030 | attr.rs | E0425 fstatat ×1 | rustix::fs::statat — fstatat is a doc alias only (the round-2 probe that said "fstatat exists" matched the alias doc, not the fn) |
+| 031 | fusemount.rs + bsd_compat.rs (file) | E0425 XATTR_REPLACE ×1 | XATTR_REPLACE (uapi/linux/xattr.h value 2, c_int like linux_like libc) from bsd_compat; call site goes through the import on both OSes |
+| 032 | fusemount.rs | E0308/E0277 ×5 (184; 601 ×4) | mode_t is u16 on FreeBSD: shadow-cast mode in mode_to_filetype (rustix RawMode=u16), widen libc::S_IFMT/S_IFDIR with `as u32` (no-op on Linux) |
+| 033 | fusemount.rs | E0599 RENAME_* ×3 | fuser defines RENAME_WHITEOUT/EXCHANGE/NOREPLACE only for Linux (src/rename_flags.rs cfg); Linux arms cfg'd, FreeBSD collapses to overwrite-or-create from dst_exists |
+| 034 | fusemount.rs | E0308 ×2 (2235) | statfs f_fstypename/f_mntfromname are [c_char; N] (i8 on amd64): name() closure now takes &[c_char] and collects to bytes; call sites unchanged |
+| 035 | migrate.rs | E0308/E0599 ×5 | round-2 patch named the OpenOptions `fs_opts`, shadowing the fn's `fs_opts: c::bch_opts` param used by pick_block_size/pick_bucket_size/check_bucket_size/format — renamed to `open_opts` |
+| 036 | mount.rs | E0283 ×1 | data_ptr's only FreeBSD use is an `as *mut c_void` cast (pins no type) — annotated `*const libc::c_void` |
+| 037 | fs_context.rs | E0308 ×5 | SYS_fsopen/fsconfig/fsmount/move_mount placeholders c_long → c_int: FreeBSD libc::syscall(num: c_int, ...) vs Linux's c_long |
+
+BSD decisions of note: RENAME_* arms assume fusefs(5) never sends
+renameat2 flags (it has no such protocol bits — fuser only parses them on
+Linux); XATTR_REPLACE keeps Linux ABI value 2 because bch2_xattr_set reads
+the raw word; the statfs field rewrite is a byte-view map (c_char → u8),
+not a re-encoding.
+
 ## Open risks / next-build watchlist
 
 1. **rustix::fs::Dir/FileType on FreeBSD** — compiles (no 19d errors), but

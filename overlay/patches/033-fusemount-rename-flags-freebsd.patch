@@ -1,0 +1,38 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -1297,6 +1297,10 @@
+         eprintln!("fuse_rename(src_dir={}, {:?} -> dst_dir={}, {:?}, flags={})",
+                src_dir.inum, name, dst_dir.inum, newname, flags);
+ 
++        // RENAME_WHITEOUT is Linux overlayfs-only: fuser defines it just
++        // for Linux and FreeBSD's fusefs never sets it, so there is nothing
++        // to reject here.
++        #[cfg(target_os = "linux")]
+         if flags.contains(RenameFlags::RENAME_WHITEOUT) {
+             reply.error(Errno::EINVAL);
+             return;
+@@ -1320,6 +1324,7 @@
+             Err(e) => { reply.error(bch_err(&e)); return; }
+         };
+ 
++        #[cfg(target_os = "linux")]
+         let mode = if flags.contains(RenameFlags::RENAME_EXCHANGE) {
+             if !dst_exists {
+                 reply.error(Errno::ENOENT);
+@@ -1335,6 +1340,16 @@
+         } else {
+             c::bch_rename_mode::BCH_RENAME
+         };
++        // FreeBSD: no renameat2(2) flags exist - fuser defines
++        // RENAME_EXCHANGE/RENAME_NOREPLACE only for Linux and fusefs(5)
++        // never sends them - so the choice collapses to whether the target
++        // name exists.
++        #[cfg(target_os = "freebsd")]
++        let mode = if dst_exists {
++            c::bch_rename_mode::BCH_RENAME_OVERWRITE
++        } else {
++            c::bch_rename_mode::BCH_RENAME
++        };
+ 
+         match fuse_rename(fs, src_dir, name, dst_dir, newname, mode) {
+             Ok(dst_bi) => {

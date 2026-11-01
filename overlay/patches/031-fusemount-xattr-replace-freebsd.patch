@@ -1,0 +1,27 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -72,6 +72,15 @@
+ 
+ use crate::util::AlignedBuf;
+ 
++// XATTR_REPLACE: the flag word passed to rust_fuse_xattr_set() below and
++// interpreted by bch2_xattr_set() is the Linux xattr(2) ABI (uapi/linux/
++// xattr.h). The libc crate exports it only for linux_like targets, so on
++// FreeBSD the same value comes from bsd_compat.
++#[cfg(target_os = "linux")]
++use libc::XATTR_REPLACE;
++#[cfg(target_os = "freebsd")]
++use crate::bsd_compat::XATTR_REPLACE;
++
+ // Linux mount(2) MS_* flag bits. libc defines them only for Linux targets;
+ // on FreeBSD none of this reaches a kernel mount (fuser's libfuse3 backend
+ // does the mounting, and the bits with a BSD meaning are translated there),
+@@ -1722,7 +1731,7 @@
+         // As the VFS does: XATTR_REPLACE, so that a missing xattr is ENODATA
+         let ret = unsafe {
+             c::rust_fuse_xattr_set(self.fs().as_ptr(), inum, name.as_ptr(), std::ptr::null(), 0,
+-                              libc::XATTR_REPLACE)
++                              XATTR_REPLACE)
+         };
+         match ret {
+             0 => reply.ok(),
