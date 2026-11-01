@@ -1,0 +1,22 @@
+--- a/src/commands/migrate.rs
++++ b/src/commands/migrate.rs
+@@ -358,13 +358,15 @@
+     let fs_path_cstr = CString::new(fs_path)?;
+     #[cfg(target_os = "linux")]
+     use std::os::unix::fs::OpenOptionsExt;
+-    let mut fs_opts = std::fs::OpenOptions::new();
+-    fs_opts.read(true);
++    // Named open_opts, not fs_opts: fs_opts is this function's c::bch_opts
++    // parameter, still read by pick_block_size()/format() below.
++    let mut open_opts = std::fs::OpenOptions::new();
++    open_opts.read(true);
+     // O_NOATIME is Linux-only (FreeBSD atime policy is per-mount,
+     // MNT_NOATIME); it is a read hint, so FreeBSD just opens without it.
+     #[cfg(target_os = "linux")]
+-    fs_opts.custom_flags(libc::O_NOATIME);
+-    let fs_file = fs_opts
++    open_opts.custom_flags(libc::O_NOATIME);
++    let fs_file = open_opts
+         .open(fs_path)
+         .map_err(|e| anyhow!("Error opening {}: {}", fs_path, e))?;
+ 
