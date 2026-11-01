@@ -72,3 +72,8 @@ Linux build takes from glibc/UAPI); modifications of upstream files are
 | `patches/035-migrate-openopts-shadow.patch` | patch | migrate.rs: rename local OpenOptions fs_opts→open_opts (shadowed the bch_opts param) |
 | `patches/036-mount-dataptr-type-freebsd.patch` | patch | mount.rs: data_ptr gets explicit *const c_void (FreeBSD arm casts only) |
 | `patches/037-fs-context-syscall-cint.patch` | patch | fs_context.rs: SYS_* placeholders c_long→c_int (FreeBSD libc::syscall takes c_int) |
+| `patches/038-mount-unsafe-wrap.patch` | patch | mount.rs: wrap syscall/mount call in unsafe (Rust 2024 extern rules) |
+| `patches/039-build-link-freebsd-libs.patch` | patch | build-link.rs: skip -lkeyutils/-laio on FreeBSD (stubbed in libbcachefs.a) |
+| `patches/040-stdout-linkname-freebsd.patch` | patch | bcachefs.rs: extern stdout → FreeBSD __stdoutp link_name |
+| `patches/041-page-h-freebsd-pagemask.patch` | patch | include/linux/page.h: #undef+force Linux PAGE_SIZE/PAGE_MASK/PAGE_SHIFT — machine/param.h (via sys/user.h) predefines PAGE_MASK=(PAGE_SIZE-1), the INVERSE offset mask; virt_to_page/offset_in_page swapped roles, 64-bit addr truncated into 32-bit bvec bv_offset → preadv/pwritev EFAULT on every IO |
+| `patches/042-bdev-fstat-freebsd.patch` | patch | src/wrappers/bdev.rs: fd_metadata() /proc/self/fd/N → libc::fstat(2) (no /proc on FreeBSD); is_block_device() S_IFMT check; st_rdev/st_size/st_blksize fields |

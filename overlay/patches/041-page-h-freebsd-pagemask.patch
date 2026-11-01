@@ -1,0 +1,29 @@
+--- a/include/linux/page.h
++++ b/include/linux/page.h
+@@ -5,13 +5,22 @@
+ 
+ struct page;
+ 
+-#ifndef PAGE_SIZE
+-
++/* FreeBSD: <machine/param.h> (reached via <sys/user.h>) predefines
++ * PAGE_SIZE as an int expression and PAGE_MASK as (PAGE_SIZE - 1) -
++ * the offset-bit mask, the inverse of Linux's page-number mask
++ * ~(PAGE_SIZE - 1). The #ifndef guard that used to stand here kept
++ * FreeBSD's PAGE_MASK, swapping virt_to_page() and offset_in_page()
++ * roles: the page-aligned address landed in the 32-bit bvec bv_offset
++ * truncated to its low 32 bits, and every IO failed with preadv/pwritev
++ * EFAULT. Force Linux semantics, 64-bit clean.
++ */
++#undef PAGE_SHIFT
++#undef PAGE_SIZE
++#undef PAGE_MASK
+ #define PAGE_SIZE   4096UL
+ #define PAGE_MASK   (~(PAGE_SIZE - 1))
++#define PAGE_SHIFT  12
+ 
+-#endif
+-
+ static const size_t linux_page_size = PAGE_SIZE;
+ 
+ #ifndef PAGE_SHIFT
