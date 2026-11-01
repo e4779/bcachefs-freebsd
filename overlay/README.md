@@ -33,7 +33,8 @@ Linux build takes from glibc/UAPI); modifications of upstream files are
 | `include/sys/sysmacros.h` | file | glibc-only header; makedev lives in sys/types.h on BSD |
 | `include/asm/types.h`, `include/linux/types.h`, `const.h`, `limits.h`, `errno.h` | file | glibc UAPI headers absent on FreeBSD; keystone pair everything else chains through |
 | `include/linux/fs.h` | file | BLKGETSIZE64/BLKSSZGET→DIOCGMEDIASIZE/DIOCGSECTORSIZE, BLKPBSZGET/BLKROTATIONAL constants |
-| `include/linux/fiemap.h`, `ktime.h`, `capability.h`, `numa.h`, `dynamic_debug.h`, `futex.h`, … | file | Linux UAPI/glibc headers the sources include but never use on the userspace path — presence stubs |
+| `include/linux/fiemap.h`, `ktime.h`, `capability.h`, `numa.h`, `dynamic_debug.h`, … | file | Linux UAPI/glibc headers the sources include but never use on the userspace path — presence stubs |
+| `include/linux/futex.h` | file | FUNCTIONAL shim, not a stub: futex() → _umtx_op(2); timeout ADDRESS goes in uaddr2 with the struct SIZE in uaddr (backwards = kernel copyins from address 24 → EFAULT, shrinker thread busy-spin); FUTEX_WAIT_BITSET → _umtx_time{UMTX_ABSTIME,CLOCK_MONOTONIC} |
 | `patches/001-makefile-freebsd.patch` | patch | drop libkeyutils from PKGCONFIG_LIBS; udevdir fallback; drop -lrt -lkeyutils -laio -ldl |
 | `patches/002-autoconf-freebsd-compat.patch` | patch | force-include freebsd_compat.h from c_src/autoconf.h (C and bindgen see the same mapping) |
 | `patches/007-blkdev-alloca-freebsd.patch` | patch | blkdev.c: alloca.h is glibc-only; FreeBSD takes alloca(3) from stdlib.h |
@@ -77,3 +78,4 @@ Linux build takes from glibc/UAPI); modifications of upstream files are
 | `patches/040-stdout-linkname-freebsd.patch` | patch | bcachefs.rs: extern stdout → FreeBSD __stdoutp link_name |
 | `patches/041-page-h-freebsd-pagemask.patch` | patch | include/linux/page.h: #undef+force Linux PAGE_SIZE/PAGE_MASK/PAGE_SHIFT — machine/param.h (via sys/user.h) predefines PAGE_MASK=(PAGE_SIZE-1), the INVERSE offset mask; virt_to_page/offset_in_page swapped roles, 64-bit addr truncated into 32-bit bvec bv_offset → preadv/pwritev EFAULT on every IO |
 | `patches/042-bdev-fstat-freebsd.patch` | patch | src/wrappers/bdev.rs: fd_metadata() /proc/self/fd/N → libc::fstat(2) (no /proc on FreeBSD); is_block_device() S_IFMT check; st_rdev/st_size/st_blksize fields |
+| `patches/043-btree-cache-mmap-anon-fd-freebsd.patch` | patch | fs/btree/cache.c: userspace aux_data mmap passes fd 0 to MAP_ANONYMOUS — Linux ignores fd, FreeBSD requires -1 (EINVAL); the NULL aux_data surfaced as ENOMEM_fs_btree_cache_init on every fs start |

@@ -1,0 +1,21 @@
+diff --git a/fs/btree/cache.c b/fs/btree/cache.c
+index d9c13f633..72e9f43ac 100644
+--- a/fs/btree/cache.c
++++ b/fs/btree/cache.c
+@@ -253,9 +253,15 @@ static int __btree_node_data_alloc(struct bch_fs *c, struct btree_node_bufs *b,
+ #ifdef __KERNEL__
+ 		b->aux_data = kvmalloc(bytes, gfp);
+ #else
++		/*
++		 * FreeBSD mmap(2): MAP_ANONYMOUS requires fd == -1; Linux
++		 * ignores fd, so upstream's 0 slips through there. Here fd 0
++		 * is EINVAL, aux_data ends up NULL, and every fs start dies
++		 * with ENOMEM_fs_btree_cache_init.
++		 */
+ 		b->aux_data = mmap(NULL, bytes,
+ 				   PROT_READ|PROT_WRITE|PROT_EXEC,
+-				   MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
++				   MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+ 		if (b->aux_data == MAP_FAILED)
+ 			b->aux_data = NULL;
+ #endif

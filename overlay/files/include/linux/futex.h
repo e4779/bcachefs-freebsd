@@ -9,8 +9,14 @@
  *
  * linux/shrinker.c additionally uses FUTEX_WAIT_BITSET: an absolute timeout
  * against CLOCK_MONOTONIC - struct _umtx_time with UMTX_ABSTIME expresses
- * exactly that (passing sizeof(struct _umtx_time) as uaddr2 tells the
- * kernel that uaddr1 points to a _umtx_time rather than a bare timespec).
+ * exactly that.
+ *
+ * _umtx_op(2) timeout ABI (easy to get backwards): the ADDRESS of the
+ * timeout struct (timespec or _umtx_time) goes in uaddr2, while uaddr
+ * carries that struct's SIZE cast to uintptr_t - 0/NULL means wait forever.
+ * With the two swapped, the kernel copyins the timeout from address 24 and
+ * every timed wait fails instantly with EFAULT (observed as the shrinker
+ * thread busy-spinning ~20x/sec in truss).
  * The bit mask (val3) is not translated: the only caller waits with ~0, and
  * a plain FUTEX_WAKE wakes such a waiter; bitmask-granular waking is not
  * expressible in _umtx_op and nothing in tools would exercise it.
@@ -45,7 +51,8 @@ static inline int futex(uint32_t *uaddr, int op, uint32_t val,
 		umtx_op = (op & FUTEX_PRIVATE_FLAG)
 			? UMTX_OP_WAIT_UINT_PRIVATE : UMTX_OP_WAIT_UINT;
 		ret = _umtx_op(uaddr, umtx_op, val,
-			       (void *)(uintptr_t)timeout, NULL);
+			       timeout ? (void *)(uintptr_t)sizeof(*timeout) : NULL,
+			       (void *)(uintptr_t)timeout);
 		break;
 	case FUTEX_WAIT_BITSET: {
 		struct _umtx_time umt = {
@@ -55,8 +62,8 @@ static inline int futex(uint32_t *uaddr, int op, uint32_t val,
 		};
 		umtx_op = (op & FUTEX_PRIVATE_FLAG)
 			? UMTX_OP_WAIT_UINT_PRIVATE : UMTX_OP_WAIT_UINT;
-		ret = _umtx_op(uaddr, umtx_op, val, &umt,
-			       (void *)(uintptr_t)sizeof(umt));
+		ret = _umtx_op(uaddr, umtx_op, val,
+			       (void *)(uintptr_t)sizeof(umt), &umt);
 		break;
 	}
 	case FUTEX_WAKE:
