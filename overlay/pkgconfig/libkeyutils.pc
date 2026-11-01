@@ -1,0 +1,7 @@
+prefix=/usr/local
+Name: libkeyutils
+Description: keyutils stub for FreeBSD (bcachefs-freebsd overlay; no system port exists)
+Version: 1.6.3
+# Only include paths are consumed (bch_bindgen build.rs bindgen pass).
+# Symbols come from the C stub compiled into the tools archive (overlay c_src/keyutils_stub.c).
+Cflags: -I${pcfiledir}/../../tools/include
