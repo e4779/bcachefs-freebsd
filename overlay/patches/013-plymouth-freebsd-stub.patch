@@ -1,0 +1,35 @@
+--- a/src/plymouth.rs
++++ b/src/plymouth.rs
+@@ -13,14 +13,30 @@
+ //! callers truncate before asking rather than after being told.
+ 
+ use std::io::{self, Write};
++#[cfg(target_os = "linux")]
+ use std::os::linux::net::SocketAddrExt;
+-use std::os::unix::net::{SocketAddr, UnixStream};
++use std::os::unix::net::UnixStream;
++#[cfg(target_os = "linux")]
++use std::os::unix::net::SocketAddr;
+ 
+ /// The most a display-message can carry, the length being one byte.
+ pub const MAX: usize = 254;
+ 
+ pub fn connect() -> io::Result<UnixStream> {
+-    UnixStream::connect_addr(&SocketAddr::from_abstract_name("/org/freedesktop/plymouthd")?)
++    #[cfg(target_os = "linux")]
++    {
++        UnixStream::connect_addr(&SocketAddr::from_abstract_name(
++            "/org/freedesktop/plymouthd",
++        )?)
++    }
++    // FreeBSD: plymouthd speaks over a Linux abstract-namespace socket,
++    // which FreeBSD's unix(4) doesn't have — and no port provides a
++    // replacement. Report absent; every caller already treats "cannot
++    // connect" as "no splash to worry about".
++    #[cfg(target_os = "freebsd")]
++    {
++        Err(io::Error::from_raw_os_error(libc::ENOENT))
++    }
+ }
+ 
+ /// As much of @s as will fit, cut on a character boundary.
