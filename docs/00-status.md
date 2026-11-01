@@ -23,7 +23,7 @@
 | T06 образ | скрипт готов (scripts/mk-test-fs.sh) | — | —
 | T07 fsck | скрипт готов (clean/fill режимы) | — | —
 | T08 контроль FUSE | скрипт готов; нужен порт fusefs-ufs (не в одобренном списке — спросить owner) | — | scripts/control-fuse-test.sh
-| T09 fuser-форк | следующий после G0 — главный риск | — | лекало fuse-ufs
+| T09 fuser-форк | ✅ патчи 010-012 (251 LOC, fuseblk BSD-ветка, fuse_claim→Ok(None) делегат libfuse3) — | лекало fuse-ufs
 | T10/T11 FUSE mount+rw | скрипты-обёртки готовы | — | —\n| T12 bench | каркас готов (bench/*) | — | планка: 12.8 мс/файл
 
 ## Оркестрационные константы (уроки)
