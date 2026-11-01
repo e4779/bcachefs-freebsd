@@ -71,4 +71,19 @@ int bch_fallocate_freebsd(int fd, int mode, off_t offset, off_t len);
 #define fallocate(fd, mode, offset, len) \
 	bch_fallocate_freebsd(fd, mode, offset, len)
 
+/*
+ * Linux gettid(2)/SYS_gettid: the only users are current->pid assignments
+ * (kthread.c, sched.c); sched.c documents it as the anchor for
+ * stack_trace_save_tsk()/dump_stack() - a unique per-thread id. thr_self(2)
+ * fills in FreeBSD's kernel thread id, which is exactly that.
+ */
+#include <sys/thr.h>
+static inline pid_t bch_gettid(void)
+{
+	long tid = 0;
+
+	thr_self(&tid);
+	return (pid_t)tid;
+}
+
 #endif /* _BCACHEFS_TOOLS_FREEBSD_COMPAT_H */

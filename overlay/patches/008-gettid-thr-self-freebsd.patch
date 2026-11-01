@@ -1,0 +1,16 @@
+--- a/linux/kthread.c
++++ b/linux/kthread.c
+@@ -27,4 +27,4 @@
+ 
+ 	current = data;
+-	current->pid = syscall(SYS_gettid);	/* only knowable from in here */
++	current->pid = bch_gettid();		/* only knowable from in here */
+ 	schedule();
+--- a/linux/sched.c
++++ b/linux/sched.c
+@@ -116,4 +116,4 @@
+ 
+ 	p->state	= TASK_RUNNING;
+-	p->pid		= syscall(SYS_gettid);
++	p->pid		= bch_gettid();
+ 	/*
