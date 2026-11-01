@@ -1,0 +1,17 @@
+--- a/build-link.rs
++++ b/build-link.rs
+@@ -19,7 +19,12 @@
+     println!("cargo:rustc-link-lib=lz4");
+     println!("cargo:rustc-link-lib=zstd");
+     println!("cargo:rustc-link-lib=udev");
+-    println!("cargo:rustc-link-lib=keyutils");
+-    println!("cargo:rustc-link-lib=aio");
++    // FreeBSD: libkeyutils/libaio do not exist as system libs; their stubs
++    // are compiled into libbcachefs.a (see overlay c_src/keyutils_stub.c and
++    // the libaio ENOSYS stub selecting blkdev.c's sync fops fallback).
++    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("freebsd") {
++        println!("cargo:rustc-link-lib=keyutils");
++        println!("cargo:rustc-link-lib=aio");
++    }
+     println!("cargo:rustc-link-lib=unwind");
+ }
