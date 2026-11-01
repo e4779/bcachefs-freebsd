@@ -1,0 +1,13 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -1882,6 +1882,10 @@
+     // fuser defaults to nodev,nosuid, as fusermount does for an unprivileged
+     // user mounting something untrusted. This is root mounting a block device,
+     // as trusted as a kernel mount - so like mount(8), only what -o asks for:
++    // FreeBSD: MountOption::Dev reaches mount_fusefs(8) as "-o dev", which it
++    // does not support (fusefs(4) has no device-node mount semantic to enable);
++    // nodev behavior is the only honest mapping there.
++    #[cfg(not(target_os = "freebsd"))]
+     if !mount_options.contains(&MountOption::NoDev) {
+         mount_options.push(MountOption::Dev);
+     }
