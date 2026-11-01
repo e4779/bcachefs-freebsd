@@ -1,0 +1,12 @@
+--- a/linux/blkdev.c
++++ b/linux/blkdev.c
+@@ -1,4 +1,9 @@
+ 
++#ifdef __FreeBSD__
++/* alloca(3) is declared in <stdlib.h>; there is no <alloca.h>. */
++#include <stdlib.h>
++#else
+ #include <alloca.h>
++#endif
+ #include <errno.h>
+ #include <fcntl.h>

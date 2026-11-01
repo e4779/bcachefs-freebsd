@@ -1,0 +1,14 @@
+--- a/linux/shrinker.c
++++ b/linux/shrinker.c
+@@ -19,4 +19,10 @@
+ #include "tools-util.h"
+ 
++/*
++ * FreeBSD's <sys/queue.h> (dragged in by system headers after linux/list.h)
++ * redefines LIST_HEAD(name, type) with two arguments, so the kernel-style
++ * single-argument macro no longer expands at the use site. CDS_LIST_HEAD is
++ * what linux/list.h maps LIST_HEAD to; use it directly.
++ */
+-static LIST_HEAD(shrinker_list);
++static CDS_LIST_HEAD(shrinker_list);
+ static DEFINE_MUTEX(shrinker_lock);
