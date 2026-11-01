@@ -1,0 +1,54 @@
+--- a/Makefile
++++ b/Makefile
+@@ -23,6 +23,7 @@
+ PKG_CONFIG?=pkg-config
+ INSTALL=install
+ LN=ln
++UNAME_S:=$(shell uname -s)
+ .DEFAULT_GOAL=all
+ 
+ 
+@@ -158,7 +159,13 @@
+ CFLAGS+=$(call cc-disable-warning, gnu-variable-sized-type-not-at-end)
+ export RUSTFLAGS:=$(RUSTFLAGS) -C default-linker-libraries
+ 
++ifeq ($(UNAME_S),FreeBSD)
++# libkeyutils: no FreeBSD port; replaced by the stub in overlay (include/keyutils.h +
++# c_src/keyutils_stub.c) - keyring is only used for encrypted-FS key management.
++PKGCONFIG_LIBS="blkid uuid liburcu libsodium zlib liblz4 libzstd libudev libunwind"
++else
+ PKGCONFIG_LIBS="blkid uuid liburcu libsodium zlib liblz4 libzstd libudev libkeyutils libunwind"
++endif
+ 
+ # Only query pkg-config for targets that compile or do a full install.
+ # Targets like install_dkms and clean don't need build dependencies.
+@@ -175,8 +182,14 @@
+ endif
+ PKGCONFIG_UDEVDIR:=$(shell $(PKG_CONFIG) --variable=udevdir udev)
+ ifeq (,$(PKGCONFIG_UDEVDIR))
++ifeq ($(UNAME_S),FreeBSD)
++# libudev-devd ships no udevdir variable in udev.pc: fall back to the FreeBSD
++# convention instead of failing the build (only rules-install paths use it).
++PKGCONFIG_UDEVDIR:=/usr/local/lib/udev
++else
+     $(error pkg-config error, command: $(PKG_CONFIG) --variable=udevdir udev)
+ endif
++endif
+ PKGCONFIG_UDEVRULESDIR:=$(PKGCONFIG_UDEVDIR)/rules.d
+ 
+ CFLAGS+=$(PKGCONFIG_CFLAGS)
+@@ -184,7 +197,14 @@
+ 
+ endif # NEEDS_PKGCONFIG
+ 
++ifeq ($(UNAME_S),FreeBSD)
++# -lrt/-ldl live in libc; -lkeyutils/-laio are stubs compiled into the tree
++# (c_src/keyutils_stub.c, c_src/libaio_stub.c - io_setup() returns -ENOSYS and
++# linux/blkdev.c falls back to synchronous preadv/pwritev).
++LDLIBS+=-lm -lpthread
++else
+ LDLIBS+=-lm -lpthread -lrt -lkeyutils -laio -ldl
++endif
+ LDLIBS+=$(EXTRA_LDLIBS)
+ 
+ ifeq ($(PREFIX),/usr)

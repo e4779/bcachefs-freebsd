@@ -1,0 +1,8 @@
+--- a/Makefile
++++ b/Makefile
+@@ -528,3 +528,4 @@
+ DKMS_PARALLEL_JOBS:=$(shell \
+-	j=$$(( $$(awk '/^MemTotal:/{print $$2}' /proc/meminfo) / 1024 / 512 )); \
++	j=$$(( $$(awk '/^MemTotal:/{print $$2}' /proc/meminfo 2>/dev/null || \
++		echo 4194304) / 1024 / 512 )); \
+ 	c=$$(nproc); [ $$c -lt $$j ] && j=$$c; [ $$j -lt 1 ] && j=1; echo $$j)

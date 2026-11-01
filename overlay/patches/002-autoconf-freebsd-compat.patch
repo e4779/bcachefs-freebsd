@@ -1,0 +1,16 @@
+--- a/c_src/autoconf.h
++++ b/c_src/autoconf.h
+@@ -32,4 +32,13 @@
+ #define CONFIG_STACKTRACE		1
+ #define CONFIG_BCACHEFS_ASYNC_OBJECT_LISTS	1
+ 
++
++/*
++ * FreeBSD: per-TU userspace compat shims (pwritev2->pwritev, fallocate->
++ * fcntl(F_FRESP), ...), forced in exactly the way this file is - so C and
++ * bindgen see the same mapping. See c_src/freebsd_compat.h.
++ */
++#ifdef __FreeBSD__
++#include "freebsd_compat.h"
++#endif
+ #endif /* _BCACHEFS_TOOLS_AUTOCONF_H */
