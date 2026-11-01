@@ -38,3 +38,9 @@ All repositories are up to date.
 pkg: No packages available to install matching 'e2fsprogs-libuuid' have been found in the repositories
 pkg: No packages available to install matching 'lz4' have been found in the repositories
 ```
+
+## rctl эксперименты (2026-11-01)
+- exec-наследование: подтверждено (bun под process:$$:memoryuse=50m:deny упал на 300MB аллокации).
+- fork-наследование: подтверждено — ребёнок под родительским кэпом убит.
+- Пред-существующее правило: user:_p2p:memoryuse:deny=8589934592 (владелец уже управляет p2p-сервисами через rctl).
+- pkg: liblz4 OK, libuuid (util-linux) установлен; e2fsprogs-libuuid в локальном репо hlab отсутствует — libuuid подходит.
