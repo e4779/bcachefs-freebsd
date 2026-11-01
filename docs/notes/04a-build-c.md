@@ -52,3 +52,21 @@
 ### Run 17 — оркестраторский слот (14:05+)
 Пивот оркестрации: слот сборки у оркестратора (фон своей сессии, будит надёжно); агенты — только короткие патч-ходы. Уроки runs 14/16 (осиротевшие фоновые задачи one-shot агентов) — в AGENTS.md.
 План по будильнику: ошибки из build-17.log → короткий патч-агент; успех → проверка G0.
+
+### Run 18 — patch-shims: 5 ошибок linux/{blkdev,kthread,sched,percpu,shrinker}.c
+Все 5 прошли `cc -fsyntax-only` с точными флагами gmake (контроль: crc64.c без регрессий).
+
+| Ошибка | Диагноз | Фикс |
+|---|---|---|
+| blkdev.c:2 `alloca.h` not found | glibc-заголовок; на FreeBSD alloca(3) объявлена в stdlib.h | **007**: `#ifdef` — на FreeBSD `<stdlib.h>` |
+| kthread.c:29 + sched.c:118 `SYS_gettid` | Linux syscall-номер; current->pid потребляется только backtrace'ом (stack_trace_save_tsk/dump_stack — комментарий в sched.c) и дебаг-выводом → достаточно уникального tid | freebsd_compat.h: `bch_gettid()` через **thr_self(2)** (kernel thread id, уникален и ненулевой); **008** заменяет оба вызова |
+| percpu.c:307 `MAP_NORESERVE` | на FreeBSD нет per-mapping overcommit-учёта → резервирование адресного пространства с выделением страниц по первому fault — поведение по умолчанию, флаг — семантический no-op | freebsd_compat.h: `#define MAP_NORESERVE 0` (percpu.c сам не менялся) |
+| shrinker.c:21 LIST_HEAD «too few arguments» | `<sys/queue.h>` (тянутся системными заголовками — например через pthread.h — ПОСЛЕ linux/list.h) переопределяет `LIST_HEAD(name, type)` двумя аргументами; одинарная форма больше не раскрывается | **009**: `static CDS_LIST_HEAD(shrinker_list)` — ровно то, во что linux/list.h мапит LIST_HEAD |
+| shrinker.c:45/55/77/94 `shrinker_list` / `mutex.next` | каскад от :21 (clang-рекавери подставил shrinker_lock) | уходит вместе с 009 |
+| shrinker.c:117 `FUTEX_WAIT_BITSET` | overlay futex.h (builder-c) покрывал только WAIT/WAKE семейство; WAIT_BITSET = абсолютный таймаут по CLOCK_MONOTONIC + бит-маска ~0 | futex.h: `FUTEX_WAIT_BITSET 9` + кейс через `struct _umtx_time{UMTX_ABSTIME, CLOCK_MONOTONIC}` (sizeof как uaddr2 — сигнал ядру, что uaddr1 это _umtx_time) |
+
+Семантические решения (зафиксированы):
+- **gettid→thr_self**: pid нигде не сравнивается с getpid() и не пересекает syscall-границу; честная замена — kernel tid потока.
+- **errno-контракт futex()**: `_umtx_op` возвращает errno напрямую, Linux futex(2) — `-1`+errno. Цикл таймаута shrinker-потока читает `errno != ETIMEDOUT` → без конверсии поток зависал бы. Прочие вызовы (bit_spinlock.h, sched.c) возврат игнорируют — конверсия безопасна. Вал3 (бит-маска) не транслируется: единственный ждущий использует ~0, и его будит обычный FUTEX_WAKE.
+- **LIST_HEAD — точечный фикс**, не глобальное подавление sys/queue.h (его макросы могут использовать системные заголовки; подавление guard'ом — риск сломать чужие TU). Если будущие файлы тоже сломаются на LIST_HEAD после системных include — применять тот же приём.
+- bindgen видит те же compat-добавления (force-include из autoconf.h), отдельной правки не требует.
