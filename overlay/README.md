@@ -39,6 +39,17 @@ Linux build takes from glibc/UAPI); modifications of upstream files are
 | `patches/007-blkdev-alloca-freebsd.patch` | patch | blkdev.c: alloca.h is glibc-only; FreeBSD takes alloca(3) from stdlib.h |
 | `patches/008-gettid-thr-self-freebsd.patch` | patch | kthread.c/sched.c: syscall(SYS_gettid) → bch_gettid() (thr_self(2); pid feeds only backtraces/debug) |
 | `patches/009-shrinker-listhead-freebsd.patch` | patch | shrinker.c: CDS_LIST_HEAD — sidesteps the LIST_HEAD(name,type) redefinition from sys/queue.h |
+| `src/bsd_compat.rs` | file | Rust-side FreeBSD shims: Linux MS_* flag values + ms_to_mnt(), IoctlRequest alias, xattr(2)→extattr(2) helpers (user-namespace mapping; list-format rewrite) |
+| `patches/010-rust-bsd-compat-module.patch` | patch | declare mod bsd_compat in src/bcachefs.rs (cfg freebsd) |
+| `patches/011-wrappers-ioctl-request-type.patch` | patch | wrappers: libc::Ioctl → IoctlRequest alias (libc crate has no Ioctl on FreeBSD) |
+| `patches/012-attr-freebsd-xattr.patch` | patch | attr.rs: xattr→extattr, statx(MNT_ID)→fstat/st_dev mount check, ENOATTR arm |
+| `patches/013-plymouth-freebsd-stub.patch` | patch | plymouth connect() → ENOENT (no abstract sockets / no plymouth on FreeBSD) |
+| `patches/014-format-util-physmem.patch` | patch | sysinfo(2) → sysctl hw.physmem |
+| `patches/015-migrate-noatime.patch` | patch | drop Linux-only O_NOATIME open flag |
+| `patches/016-fs-context-freebsd.patch` | patch | fs_context: MS_* shims; SYS_fs*/MOVE_MOUNT placeholders — syscall(-1)→ENOSYS → designed Ok(None) fallback |
+| `patches/017-mount-legacy-freebsd.patch` | patch | mount.rs: MS_* shims; 4-arg MNT_* mount(2) arm (kernel mount → honest ENODEV) |
+| `patches/018-copy-fs-freebsd.patch` | patch | copy_fs: llistxattr/lgetxattr→extattr, mode_t u16 casts, no O_NOATIME, syncfs→fsync |
+| `patches/019-util-statx-freebsd.patch` | patch | util.rs path_subvol → None (STATX_SUBVOL is a Linux statx extension) |
 
 ## Runtime semantics notes
 
