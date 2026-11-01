@@ -1,0 +1,14 @@
+--- a/src/bcachefs.rs
++++ b/src/bcachefs.rs
+@@ -354,6 +354,11 @@
+     // switch to block buffering which can reorder or lose output.
+     // Set both to line-buffered.
+     unsafe {
++        // FreeBSD libc: the C symbol is __stdoutp (stdout is a #define);
++        // glibc exports stdout directly.
++        #[cfg(target_os = "freebsd")]
++        extern "C" { #[link_name = "__stdoutp"] static stdout: *mut libc::FILE; }
++        #[cfg(not(target_os = "freebsd"))]
+         extern "C" { static stdout: *mut libc::FILE; }
+         libc::setvbuf(stdout, std::ptr::null_mut(), libc::_IOLBF, 0);
+     }
