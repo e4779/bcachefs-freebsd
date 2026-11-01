@@ -1,0 +1,27 @@
+--- a/src/fs_context.rs
++++ b/src/fs_context.rs
+@@ -84,18 +84,19 @@
+ 
+ // The fs_context syscalls are Linux 5.2+ ABI with no FreeBSD counterpart.
+ // These placeholders keep the plumbing below compiling; syscall(-1, ...)
++// (c_int, not c_long: FreeBSD's libc::syscall takes the number as c_int.)
+ // returns ENOSYS on FreeBSD, so FsContext::open() takes its "kernel
+ // predates the new mount API" arm (Ok(None)) and callers fall back to
+ // mount(2) — the designed degradation path, not an invented one.
+ #[cfg(target_os = "freebsd")]
+-const SYS_fsopen: libc::c_long = -1;
++const SYS_fsopen: libc::c_int = -1;
+ #[cfg(target_os = "freebsd")]
+-const SYS_fsconfig: libc::c_long = -1;
+-#[cfg(target_os = "freebsd")]
+-const SYS_fsmount: libc::c_long = -1;
++const SYS_fsconfig: libc::c_int = -1;
+ #[cfg(target_os = "freebsd")]
+-const SYS_move_mount: libc::c_long = -1;
++const SYS_fsmount: libc::c_int = -1;
+ #[cfg(target_os = "freebsd")]
++const SYS_move_mount: libc::c_int = -1;
++#[cfg(target_os = "freebsd")]
+ const MOVE_MOUNT_F_EMPTY_PATH: libc::c_ulong = 0;
+ 
+ /// The most a single fsconfig(2) parameter value can carry.
