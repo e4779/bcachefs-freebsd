@@ -6,7 +6,7 @@
 
 | Гейт | Условие | Статус
 |---|---|---|
-| G0 | `tools/bcachefs version` на FreeBSD | ⏳ Run 19c (ETIME-реставрация после мерж-инцидента; closure.o зелёный)
+| G0 | `tools/bcachefs version` на FreeBSD | ⏳ Run 20 (все 21 патч применены)
 | G1 | format→fsck→fill→verify на тест-образе | ожидает G0
 | G2 | FUSE rw тест-ФС + pjdfstest | ожидает G1
 | G3 | метаданные лучше 12.8 мс/файл моста | ожидает G2
@@ -18,8 +18,8 @@
 | T01 клон | ✅ | orchestrator | d48ba1a, notes/01a
 | T02 аудит deps | ✅ | orchestrator | notes/02a (8/10 было)
 | T03 pkg | ✅ | orchestrator (+owner) | 6 пакетов, notes/00a
-| T04 сборка C | 🏃 113+/~500 объектов + все 6 linux/-шимов собраны; Run 19b линкует | orchestrator/buildslot + patch-bio (f542fde) + patch-shims (merge 7d21efc) | notes/04a, overlay/patches 001-009
-| T05 cargo | 🏃 rust-compat: 72/93 Rust-ошибок (mount/fs_context/copy_fs/wrappers/attr) + bch_bindgen паника; fusemount.rs 21 — у fuser-porter (T09) | rust-compat + fuser-porter | build-19.log; notes/05a
+| T04 сборка C | ✅ все объекты + 6 шимов (patch-bio f542fde + patch-shims 7d21efc + errno-промоушен + ETIME-реставрация) | 3 агента + orchestrator | notes/04a, patches 001-009
+| T05/T09 Rust+fuse | ✅ merge fecf4e8 (rust-compat, патчи 020-029, bsd_compat 193 LOC) + ab16702 (fuser-porter, 010-012, fuseblk BSD-ветка); Run 20 собирает всё | 2 агента | notes/05a, 09a
 | T06 образ | скрипт готов (scripts/mk-test-fs.sh) | — | —
 | T07 fsck | скрипт готов (clean/fill режимы) | — | —
 | T08 контроль FUSE | скрипт готов; нужен порт fusefs-ufs (не в одобренном списке — спросить owner) | — | scripts/control-fuse-test.sh
