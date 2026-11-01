@@ -1,0 +1,24 @@
+--- a/linux/bio.c
++++ b/linux/bio.c
+@@ -18,6 +18,21 @@
+ #include <linux/bio.h>
+ #include <linux/blkdev.h>
+ #include <linux/slab.h>
+ #include <linux/kernel.h>
++#include <linux/errno.h>
++
++/* Linux-only errno names FreeBSD lacks; same policy as
++ * include/linux/errno.h (Linux numbers, bch-internal error mapping only,
++ * never cross a host syscall). Kept local, not promoted to the shared
++ * shim, because the shim is a live build input during Run 18. */
++#ifndef EBADE
++#define EBADE		52	/* Invalid exchange */
++#endif
++#ifndef EREMOTEIO
++#define EREMOTEIO	121	/* Remote I/O error */
++#endif
++#ifndef EREMCHG
++#define EREMCHG		78	/* Remote address changed */
++#endif
+ 
+ static const struct {

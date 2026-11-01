@@ -52,3 +52,22 @@
 ### Run 17 — оркестраторский слот (14:05+)
 Пивот оркестрации: слот сборки у оркестратора (фон своей сессии, будит надёжно); агенты — только короткие патч-ходы. Уроки runs 14/16 (осиротевшие фоновые задачи one-shot агентов) — в AGENTS.md.
 План по будильнику: ошибки из build-17.log → короткий патч-агент; успех → проверка G0.
+
+#### Ошибки bio.c в Run 17 — анализ и фикс (patch-bio, T04)
+
+Run 17 упал на `linux/bio.c` — 6 ошибок (4 корневые + 2 каскадные):
+
+| Ошибка | Диагноз |
+|---|---|
+| :32 `EREMOTEIO`, :33 `EBADE`, :34 `ENODATA`, :42 `EREMCHG` — undeclared | Linux-only errno, которых нет во FreeBSD `<errno.h>`. bio.c вообще не включает наш `<linux/errno.h>`-shadow (ENODATA там есть, EREMOTEIO/EBADE/EREMCHG — нет) |
+| :61 и :70 `sizeof` → incomplete type `blk_errors[]` | Каскад, не GCC-ism: undeclared идентификаторы ломают designated-инициализаторы → clang держит массив incomplete → `ARRAY_SIZE(blk_errors)` в `WARN_ON_ONCE` не компилируется |
+
+Фикс — `overlay/patches/006-bio-errno-freebsd.patch` (только bio.c):
+- `#include <linux/errno.h>` (shadow) — закрывает ENODATA и тянет shared-имена тем же путём, что и остальная сборка;
+- локальные guarded `#define EBADE 52 / EREMOTEIO 121 / EREMCHG 78` — Linux-номера, политика та же, что у linux/errno.h-shadow: bch-внутренний error-mapping, host syscall не пересекают.
+
+Почему НЕ в общий shim (linux/errno.h / freebsd_compat.h, как ETIME в Run 15): во время фикса в tools/ крутился Run 18 (gmake -k); перекладка общего force-included заголовка mid-build — гонка для ещё не скомпилированных TU. Патч одного .c race-free: bio.o в Run 18 уже упал, gmake файл не пересмотрит.
+
+Follow-up после Run 18: промоутнуть EREMOTEIO/EBADE/EREMCHG в `overlay/files/include/linux/errno.h`, локальные дефайны из bio.c убрать.
+
+Проверка: `cc -fsyntax-only` с флагами gmake (gnu11, -I. -Ic_src -Ifs -Iinclude -Iraid -Ibuild, -include c_src/autoconf.h, pkg-config cflags) — exit 0, ошибок 0, 15 предсуществующих warnings (macro-redefined шум, тот же класс что в логе Run 17 у соседних TU). apply.sh идемпотентен (повтор → SKIP 006).
