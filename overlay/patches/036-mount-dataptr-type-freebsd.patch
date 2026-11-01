@@ -1,0 +1,15 @@
+--- a/src/commands/mount.rs
++++ b/src/commands/mount.rs
+@@ -406,7 +406,11 @@
+     // convert to pointers for ffi
+     let c_src = c_src.as_ptr();
+     let c_target = c_target.as_ptr();
+-    let data_ptr = data.as_ref().map_or(ptr::null(), |data| data.as_ptr().cast());
++    // The FreeBSD arm below only casts data_ptr (`as *mut c_void` pins no
++    // type), so name the type instead of relying on libc::mount's data
++    // parameter to infer it.
++    let data_ptr: *const libc::c_void =
++        data.as_ref().map_or(ptr::null(), |data| data.as_ptr().cast());
+     let fstype = fstype.as_ptr();
+ 
+     let mut ret;
