@@ -37,6 +37,13 @@ pub const MS_STRICTATIME: libc::c_ulong = 1 << 24;
 /// `Ioctl`; FreeBSD's ioctl(2) takes the same unsigned long.
 pub type IoctlRequest = libc::c_ulong;
 
+/// XATTR_REPLACE (uapi/linux/xattr.h): the flag value libbcachefs's
+/// bch2_xattr_set() interprets on the fuse xattr path (removing an xattr is
+/// a set with a null value and XATTR_REPLACE, so a missing one is ENODATA).
+/// The libc crate exports it only for linux_like targets; the value carried
+/// here is the Linux ABI, which is the point.
+pub const XATTR_REPLACE: libc::c_int = 2;
+
 /// MNT_NODEV — in sys/mount.h but missing from the libc crate's FreeBSD
 /// module (checked libc 0.2.186).
 const MNT_NODEV: libc::c_int = 0x00000010;
