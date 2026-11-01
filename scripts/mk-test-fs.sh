@@ -8,7 +8,8 @@ IMG=${TMPDIR:-/tmp}/bcachefs-test.img
 BIN=$(dirname "$0")/../tools/bcachefs
 [ -x "$BIN" ] || { echo "no $BIN (build first)" >&2; exit 1; }
 [ -f "$IMG" ] || truncate -s "${SIZE}m" "$IMG"
-dev=$(mdconfig -t vnode -f "$IMG")
+dev=$(doas mdconfig -t vnode -f "$IMG")
 echo "image: $IMG -> $dev"
-"$BIN" format --label test --fs_size=$((SIZE*1024*1024)) "$dev"
+doas "$BIN" format --label test --fs_size=$((SIZE*1024*1024)) "$dev"
 echo "TEST FS READY: $dev (bcachefs format OK = half of gate G1; fsck next: $BIN fsck $dev)"
+# note: mdconfig+format need root on FreeBSD; md release: doas mdconfig -d -u ${dev#md}
