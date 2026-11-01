@@ -1,0 +1,20 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -2250,9 +2250,14 @@
+     // miss only costs lock_devices() its fast "already in use" error - it
+     // falls to the WAIT_MAX arm - so this is error-path UX, not correctness.
+     let Some(dev) = dev.to_str() else { return false };
+-    let name = |buf: &[u8]| match buf.iter().position(|&c| c == 0) {
+-        Some(i) => String::from_utf8_lossy(&buf[..i]).into_owned(),
+-        None => String::from_utf8_lossy(buf).into_owned(),
++    // statfs(3) string fields are [c_char; N] (i8 on amd64): collect the
++    // byte view the NUL scan and lossy UTF-8 conversion expect.
++    let name = |buf: &[libc::c_char]| {
++        let buf: Vec<u8> = buf.iter().map(|&c| c as u8).collect();
++        match buf.iter().position(|&c| c == 0) {
++            Some(i) => String::from_utf8_lossy(&buf[..i]).into_owned(),
++            None => String::from_utf8_lossy(&buf).into_owned(),
++        }
+     };
+     let mut mntbuf: *mut libc::statfs = std::ptr::null_mut();
+     let n = unsafe { libc::getmntinfo(&mut mntbuf, libc::MNT_NOWAIT) };
