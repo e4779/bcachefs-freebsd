@@ -1,0 +1,19 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -41,7 +41,15 @@
+ crossterm = { version = "0.29", default-features = false, features = ["events"] }
+ tiny_http = "0.12.0"
+ chrono = { version = "0.4.43", default-features = false, features = ["clock"] }
+-fuser = { version = "0.17", optional = true }
++# FreeBSD has no fusermount(8): fuser's default pure-rust mount backend
++# spawns it and fails at mount time. With the libfuse3 feature, fuser's
++# build.rs routes mounting through libfuse3 (port fusefs-libs3) ->
++# mount_fusefs(8) - the recipe the fuse-ufs port used with fuser 0.16.
++# On Linux the feature only swaps fuser's mount plumbing to libfuse3 as
++# well; the upstreamable shape would be a [target.'cfg(target_os =
++# "freebsd")'] section - kept unconditional because this overlay is only
++# ever applied on FreeBSD.
++fuser = { version = "0.17", optional = true, features = ["libfuse3"] }
+ # rustyline 18 requires home 0.5.12, which requires rustc 1.88 (> our 1.85 MSRV)
+ rustyline = "17.0.2"
+ 
