@@ -1,0 +1,59 @@
+--- a/src/util.rs
++++ b/src/util.rs
+@@ -59,6 +59,7 @@
+ }
+ 
+ /* Not in the libc crate yet; from linux/stat.h */
++#[cfg(target_os = "linux")]
+ const STATX_SUBVOL: libc::c_uint = 0x8000;
+ 
+ /// Which filesystem and subvolume @path is in, or None if it isn't on a
+@@ -70,23 +71,34 @@
+ /// pair changes if and only if we cross into a different filesystem or a
+ /// different subvolume.
+ fn path_subvol(path: &Path) -> Option<(u64, u64)> {
+-    use std::os::unix::ffi::OsStrExt;
+-
+-    let c_path = CString::new(path.as_os_str().as_bytes()).ok()?;
+-    let mut stx: libc::statx = unsafe { std::mem::zeroed() };
+-
+-    if unsafe {
+-        libc::statx(libc::AT_FDCWD, c_path.as_ptr(), 0, STATX_SUBVOL, &mut stx)
+-    } != 0 {
+-        return None;
++    // STATX_SUBVOL is a bcachefs patch to Linux statx(2); FreeBSD has
++    // neither the call nor the extension, so None is the honest answer —
++    // callers already treat it as "not on a kernel-visible bcachefs".
++    #[cfg(target_os = "freebsd")]
++    {
++        let _ = path;
++        None
+     }
++    #[cfg(target_os = "linux")]
++    {
++        use std::os::unix::ffi::OsStrExt;
++
++        let c_path = CString::new(path.as_os_str().as_bytes()).ok()?;
++        let mut stx: libc::statx = unsafe { std::mem::zeroed() };
+ 
+-    if stx.stx_mask & STATX_SUBVOL == 0 {
+-        return None;
+-    }
++        if unsafe {
++            libc::statx(libc::AT_FDCWD, c_path.as_ptr(), 0, STATX_SUBVOL, &mut stx)
++        } != 0 {
++            return None;
++        }
+ 
+-    Some((libc::makedev(stx.stx_dev_major, stx.stx_dev_minor),
+-          stx.stx_subvol))
++        if stx.stx_mask & STATX_SUBVOL == 0 {
++            return None;
++        }
++
++        Some((libc::makedev(stx.stx_dev_major, stx.stx_dev_minor),
++              stx.stx_subvol))
++    }
+ }
+ 
+ /// Walk up from @path to the root of the subvolume it's in.

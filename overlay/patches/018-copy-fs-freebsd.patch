@@ -1,0 +1,108 @@
+--- a/src/copy_fs.rs
++++ b/src/copy_fs.rs
+@@ -301,12 +301,23 @@
+     src: &CStr,
+ ) -> Result<(), BchError> {
+     let mut attrs_buf = vec![0u8; 65536]; // XATTR_LIST_MAX
++    #[cfg(target_os = "linux")]
+     let attrs_size = match rustix::fs::llistxattr(src, &mut attrs_buf) {
+         Ok(n) => n,
+         Err(_) => {
+             return Ok(()); // silently skip if xattrs not supported
+         }
+     };
++    // FreeBSD: extattr_list_link through bsd_compat, which rewrites the
++    // length-prefixed BSD list format to NUL-separated "user."-prefixed
++    // names so the Linux-shaped parsing below is unchanged.
++    #[cfg(target_os = "freebsd")]
++    let attrs_size = match crate::bsd_compat::llistxattr(src, &mut attrs_buf) {
++        Ok(n) => n,
++        Err(_) => {
++            return Ok(()); // silently skip if xattrs not supported
++        }
++    };
+ 
+     if attrs_size == 0 {
+         return Ok(()); // silently skip if xattrs not supported
+@@ -327,10 +338,16 @@
+ 
+         let mut val_buf = vec![0u8; 65536]; // XATTR_SIZE_MAX
+         let attr_cstr = CString::new(attr_name).unwrap();
++        #[cfg(target_os = "linux")]
+         let val_size = match rustix::fs::lgetxattr(src, &attr_cstr, &mut val_buf) {
+             Ok(n) => n,
+             Err(_) => continue,
+         };
++        #[cfg(target_os = "freebsd")]
++        let val_size = match crate::bsd_compat::lgetxattr(src, &attr_cstr, &mut val_buf) {
++            Ok(n) => n,
++            Err(_) => continue,
++        };
+ 
+         // POSIX ACLs come in the xattr API's format; bcachefs stores its
+         // own. bch2_get_acl() goes by the inode's flags, not the xattrs:
+@@ -803,7 +820,9 @@
+ 
+     let mut child = inode::find_by_inum(fs, child_inum)?;
+ 
+-    if (child.bi_mode as u32 & libc::S_IFMT) == libc::S_IFDIR {
++    // FreeBSD mode_t is u16 where Linux's is u32; widening every operand
++    // keeps the same expression valid on both.
++    if (child.bi_mode as u32 & libc::S_IFMT as u32) == libc::S_IFDIR as u32 {
+         let child_dirents = simple_readdir(fs, child_inum, &mut child)?;
+         for entry in &child_dirents {
+             recursive_remove(fs, child_inum, &mut child, entry)?;
+@@ -912,7 +931,12 @@
+ 
+     delete_non_matching_dirents(fs, s, dir_inum, dst, &dirents)?;
+ 
++    // O_NOATIME is Linux-only in rustix; it is a hint on the copy source,
++    // so FreeBSD reads without it.
++    #[cfg(target_os = "linux")]
+     let oflags = rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::NOATIME;
++    #[cfg(target_os = "freebsd")]
++    let oflags = rustix::fs::OFlags::RDONLY;
+ 
+     for d in &dirents {
+         rustix::process::fchdir(&src_fd).map_err(rustix_err)?;
+@@ -957,7 +981,7 @@
+         let mut inode = create_or_update_file(
+             fs, dir_inum, dst, &d.name,
+             d.stat.st_uid, d.stat.st_gid,
+-            d.stat.st_mode, d.stat.st_rdev,
++            d.stat.st_mode as u32, d.stat.st_rdev,
+         )?;
+ 
+         let dst_child_inum = subvol_inum(inode.bi_inum);
+@@ -970,7 +994,7 @@
+         let name_cstr = &d.name;
+         copy_xattrs(fs, &mut inode, name_cstr)?;
+ 
+-        match mode_to_type(d.stat.st_mode) {
++        match mode_to_type(d.stat.st_mode as u32) {
+             DT_DIR => {
+                 let fd = rustix::fs::openat(&src_fd, &d.name, oflags, rustix::fs::Mode::empty())
+                     .map_err(rustix_err)?;
+@@ -1022,7 +1046,7 @@
+     let name = CString::new("old_migrated_filesystem").unwrap();
+     let mut dst = create_or_update_file(
+         fs, root_inum, root_inode,
+-        &name, 0, 0, libc::S_IFREG | 0o400, 0,
++        &name, 0, 0, libc::S_IFREG as u32 | 0o400, 0,
+     )?;
+     dst.bi_size = total_sectors << 9;
+ 
+@@ -1055,7 +1079,13 @@
+     }
+ 
+     if s.migrate_type == MigrateType::Migrate {
++        #[cfg(target_os = "linux")]
+         rustix::fs::syncfs(src_fd).map_err(rustix_err)?;
++        // FreeBSD has no fd-scoped syncfs(2); fsync the source directory —
++        // it is the thing about to be read in full, which is what the sync
++        // is for.
++        #[cfg(target_os = "freebsd")]
++        rustix::fs::fsync(src_fd).map_err(rustix_err)?;
+     }
+ 
+     let mut root_inode = inode::find_by_inum(fs, root_subvol_inum())?;

@@ -1,0 +1,169 @@
+--- a/src/fs_context.rs
++++ b/src/fs_context.rs
+@@ -61,6 +61,20 @@
+     os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd},
+ };
+ 
++// The crate carries mount options in the Linux MS_* namespace end to end —
++// parsed here, translated to FreeBSD MNT_* only at the mount(2) edge — so on
++// FreeBSD the constants (uapi/linux/mount.h values) come from bsd_compat.
++#[cfg(target_os = "linux")]
++use libc::{
++    MS_DIRSYNC, MS_MANDLOCK, MS_NOATIME, MS_NODEV, MS_NODIRATIME, MS_NOEXEC,
++    MS_NOSUID, MS_RDONLY, MS_STRICTATIME, MS_SYNCHRONOUS,
++};
++#[cfg(target_os = "freebsd")]
++use crate::bsd_compat::{
++    MS_DIRSYNC, MS_MANDLOCK, MS_NOATIME, MS_NODEV, MS_NODIRATIME, MS_NOEXEC,
++    MS_NOSUID, MS_RDONLY, MS_STRICTATIME, MS_SYNCHRONOUS,
++};
++
+ const FSOPEN_CLOEXEC:  libc::c_uint = 0x0000_0001;
+ const FSMOUNT_CLOEXEC: libc::c_uint = 0x0000_0001;
+ 
+@@ -68,6 +82,22 @@
+ const FSCONFIG_SET_STRING: libc::c_uint = 1;
+ const FSCONFIG_CMD_CREATE: libc::c_uint = 6;
+ 
++// The fs_context syscalls are Linux 5.2+ ABI with no FreeBSD counterpart.
++// These placeholders keep the plumbing below compiling; syscall(-1, ...)
++// returns ENOSYS on FreeBSD, so FsContext::open() takes its "kernel
++// predates the new mount API" arm (Ok(None)) and callers fall back to
++// mount(2) — the designed degradation path, not an invented one.
++#[cfg(target_os = "freebsd")]
++const SYS_fsopen: libc::c_long = -1;
++#[cfg(target_os = "freebsd")]
++const SYS_fsconfig: libc::c_long = -1;
++#[cfg(target_os = "freebsd")]
++const SYS_fsmount: libc::c_long = -1;
++#[cfg(target_os = "freebsd")]
++const SYS_move_mount: libc::c_long = -1;
++#[cfg(target_os = "freebsd")]
++const MOVE_MOUNT_F_EMPTY_PATH: libc::c_ulong = 0;
++
+ /// The most a single fsconfig(2) parameter value can carry.
+ ///
+ /// The kernel copies it with `strndup_user(_value, 256)` (fs/fsopen.c), and
+@@ -102,13 +132,13 @@
+ /// are not disjoint: MS_RDONLY is both, and has to be sent both ways.
+ pub fn mount_attrs(mountflags: libc::c_ulong) -> libc::c_uint {
+     const MAP: &[(libc::c_ulong, libc::c_uint)] = &[
+-        (libc::MS_RDONLY,      MOUNT_ATTR_RDONLY),
+-        (libc::MS_NOSUID,      MOUNT_ATTR_NOSUID),
+-        (libc::MS_NODEV,       MOUNT_ATTR_NODEV),
+-        (libc::MS_NOEXEC,      MOUNT_ATTR_NOEXEC),
+-        (libc::MS_NOATIME,     MOUNT_ATTR_NOATIME),
+-        (libc::MS_STRICTATIME, MOUNT_ATTR_STRICTATIME),
+-        (libc::MS_NODIRATIME,  MOUNT_ATTR_NODIRATIME),
++        (MS_RDONLY,      MOUNT_ATTR_RDONLY),
++        (MS_NOSUID,      MOUNT_ATTR_NOSUID),
++        (MS_NODEV,       MOUNT_ATTR_NODEV),
++        (MS_NOEXEC,      MOUNT_ATTR_NOEXEC),
++        (MS_NOATIME,     MOUNT_ATTR_NOATIME),
++        (MS_STRICTATIME, MOUNT_ATTR_STRICTATIME),
++        (MS_NODIRATIME,  MOUNT_ATTR_NODIRATIME),
+     ];
+ 
+     MAP.iter()
+@@ -127,10 +157,10 @@
+ /// O_RDWR and gets EACCES, and mount(8)'s read-only retry has nothing to change.
+ pub fn sb_flag_params(mountflags: libc::c_ulong) -> Vec<&'static str> {
+     const MAP: &[(libc::c_ulong, &str)] = &[
+-        (libc::MS_RDONLY,      "ro"),
+-        (libc::MS_SYNCHRONOUS, "sync"),
+-        (libc::MS_DIRSYNC,     "dirsync"),
+-        (libc::MS_MANDLOCK,    "mand"),
++        (MS_RDONLY,      "ro"),
++        (MS_SYNCHRONOUS, "sync"),
++        (MS_DIRSYNC,     "dirsync"),
++        (MS_MANDLOCK,    "mand"),
+         (MS_LAZYTIME,          "lazytime"),
+     ];
+ 
+@@ -173,7 +203,7 @@
+         let fstype = CString::new(fstype).map_err(|_| invalid_input("filesystem type"))?;
+ 
+         let fd = unsafe {
+-            libc::syscall(libc::SYS_fsopen, fstype.as_ptr(), FSOPEN_CLOEXEC)
++            libc::syscall(SYS_fsopen, fstype.as_ptr(), FSOPEN_CLOEXEC)
+         } as libc::c_int;
+ 
+         if fd < 0 {
+@@ -217,7 +247,7 @@
+ 
+         let ret = unsafe {
+             libc::syscall(
+-                libc::SYS_fsconfig,
++                SYS_fsconfig,
+                 self.fd.as_raw_fd(),
+                 FSCONFIG_SET_FLAG,
+                 key.as_ptr(),
+@@ -250,7 +280,7 @@
+     /// with [`move_mount`].
+     pub fn fsmount(&self, attrs: libc::c_uint) -> io::Result<OwnedFd> {
+         let fd = unsafe {
+-            libc::syscall(libc::SYS_fsmount, self.fd.as_raw_fd(), FSMOUNT_CLOEXEC, attrs)
++            libc::syscall(SYS_fsmount, self.fd.as_raw_fd(), FSMOUNT_CLOEXEC, attrs)
+         } as libc::c_int;
+ 
+         if fd < 0 {
+@@ -305,7 +335,7 @@
+         value: *const libc::c_char,
+     ) -> io::Result<()> {
+         let ret = unsafe {
+-            libc::syscall(libc::SYS_fsconfig, self.fd.as_raw_fd(), cmd, key, value, 0)
++            libc::syscall(SYS_fsconfig, self.fd.as_raw_fd(), cmd, key, value, 0)
+         };
+ 
+         if ret < 0 {
+@@ -323,10 +353,10 @@
+ pub fn move_mount(mnt: &OwnedFd, target: &CStr) -> io::Result<()> {
+     let ret = unsafe {
+         libc::syscall(
+-            libc::SYS_move_mount,
++            SYS_move_mount,
+             mnt.as_raw_fd(), c"".as_ptr(),
+             libc::AT_FDCWD,  target.as_ptr(),
+-            libc::MOVE_MOUNT_F_EMPTY_PATH,
++            MOVE_MOUNT_F_EMPTY_PATH,
+         )
+     };
+ 
+@@ -343,7 +373,7 @@
+ 
+     #[test]
+     fn per_mount_flags_become_mount_attrs() {
+-        let attrs = mount_attrs(libc::MS_RDONLY | libc::MS_NOEXEC | libc::MS_NODEV);
++        let attrs = mount_attrs(MS_RDONLY | MS_NOEXEC | MS_NODEV);
+ 
+         assert_eq!(attrs, MOUNT_ATTR_RDONLY | MOUNT_ATTR_NOEXEC | MOUNT_ATTR_NODEV);
+         assert_eq!(mount_attrs(0), 0);
+@@ -353,7 +383,7 @@
+     /// here instead of becoming fsconfig parameters they'd vanish silently.
+     #[test]
+     fn superblock_flags_become_fsconfig_params() {
+-        let flags = libc::MS_SYNCHRONOUS | libc::MS_DIRSYNC;
++        let flags = MS_SYNCHRONOUS | MS_DIRSYNC;
+ 
+         assert_eq!(mount_attrs(flags), 0);
+         assert_eq!(sb_flag_params(flags), vec!["sync", "dirsync"]);
+@@ -363,7 +393,7 @@
+     /// VFS would reject the name and fail the mount.
+     #[test]
+     fn per_mount_only_flags_are_not_fsconfig_params() {
+-        assert!(sb_flag_params(libc::MS_NOEXEC | libc::MS_NODEV).is_empty());
++        assert!(sb_flag_params(MS_NOEXEC | MS_NODEV).is_empty());
+     }
+ 
+     /// MS_RDONLY is both, and the superblock half is the one that matters for a
+@@ -371,8 +401,8 @@
+     /// devices O_RDWR and the mount fails EACCES, which is generic/050.
+     #[test]
+     fn rdonly_is_both_a_mount_attr_and_an_sb_param() {
+-        assert_eq!(mount_attrs(libc::MS_RDONLY), MOUNT_ATTR_RDONLY);
+-        assert_eq!(sb_flag_params(libc::MS_RDONLY), vec!["ro"]);
++        assert_eq!(mount_attrs(MS_RDONLY), MOUNT_ATTR_RDONLY);
++        assert_eq!(sb_flag_params(MS_RDONLY), vec!["ro"]);
+     }
+ 
+     #[test]

@@ -1,0 +1,146 @@
+--- a/src/commands/mount.rs
++++ b/src/commands/mount.rs
+@@ -15,6 +15,23 @@
+ use clap::Parser;
+ use log::{debug, error, info, warn};
+ use uuid::Uuid;
++
++// Mount options are parsed and carried in the Linux MS_* namespace
++// throughout the crate, translated to FreeBSD MNT_* only at the mount(2)
++// edge; on FreeBSD the constants (uapi/linux/mount.h values) come from
++// bsd_compat.
++#[cfg(target_os = "linux")]
++use libc::{
++    MS_DIRSYNC, MS_MANDLOCK, MS_NOATIME, MS_NODEV, MS_NODIRATIME, MS_NOEXEC,
++    MS_NOSUID, MS_RDONLY, MS_RELATIME, MS_REMOUNT, MS_STRICTATIME,
++    MS_SYNCHRONOUS,
++};
++#[cfg(target_os = "freebsd")]
++use crate::bsd_compat::{
++    MS_DIRSYNC, MS_MANDLOCK, MS_NOATIME, MS_NODEV, MS_NODIRATIME, MS_NOEXEC,
++    MS_NOSUID, MS_RDONLY, MS_RELATIME, MS_REMOUNT, MS_STRICTATIME,
++    MS_SYNCHRONOUS,
++};
+ use crate::degraded;
+ use crate::device_scan;
+ use crate::recovery_display::RecoveryDisplay;
+@@ -226,7 +243,7 @@
+         // yet - the retry produces the real outcome, and this context's log dies
+         // with it.
+         if matches!(e.raw_os_error(), Some(libc::EACCES | libc::EROFS))
+-            && mountflags & libc::MS_RDONLY == 0
++            && mountflags & MS_RDONLY == 0
+         {
+             return Ok(Mounted::WriteProtected);
+         }
+@@ -332,7 +349,7 @@
+     // a parameter, so that one still goes through a keyring.
+     let user_key = unlocked.and_then(|u| u.hex());
+ 
+-    if mountflags & libc::MS_REMOUNT == 0 {
++    if mountflags & MS_REMOUNT == 0 {
+         if let Some(src_str) = src.to_str() {
+             let c_target = path_to_cstr(target);
+             let mut flags = mountflags;
+@@ -345,7 +362,7 @@
+                     Mounted::UseLegacy => break,
+                     Mounted::WriteProtected => {
+                         println!("mount: device write-protected, mounting read-only");
+-                        flags |= libc::MS_RDONLY;
++                        flags |= MS_RDONLY;
+                     }
+                 }
+             }
+@@ -397,20 +414,36 @@
+         ret = {
+             info!("mounting filesystem");
+             // REQUIRES: CAP_SYS_ADMIN
+-            unsafe { libc::mount(c_src, c_target, fstype, mountflags, data_ptr) }
++            #[cfg(target_os = "linux")]
++            {
++                unsafe { libc::mount(c_src, c_target, fstype, mountflags, data_ptr) }
++            }
++            // FreeBSD mount(2) is mount(type, dir, flags, data) with MNT_*
++            // flags. The vfsconf type lookup happens before the data
++            // argument is touched, and kernel bcachefs does not exist on
++            // FreeBSD, so this call's only honest outcome is ENODEV — a
++            // real mount there goes through the fuse path.
++            #[cfg(target_os = "freebsd")]
++            {
++                let _ = c_src;
++                libc::mount(fstype,
++                            c_target,
++                            crate::bsd_compat::ms_to_mnt(mountflags),
++                            data_ptr as *mut libc::c_void)
++            }
+         };
+ 
+         let err = errno::errno().0;
+ 
+         if ret == 0
+             || (err != libc::EACCES && err != libc::EROFS)
+-            || (mountflags & libc::MS_RDONLY) != 0
++            || (mountflags & MS_RDONLY) != 0
+         {
+             break;
+         }
+ 
+         println!("mount: device write-protected, mounting read-only");
+-        mountflags |= libc::MS_RDONLY;
++        mountflags |= MS_RDONLY;
+     }
+ 
+     drop(data);
+@@ -475,20 +508,20 @@
+ 
+     for opt in options.as_ref().split(',') {
+         match opt {
+-            "dirsync"     => flag!(libc::MS_DIRSYNC, fuser::MountOption::DirSync),
++            "dirsync"     => flag!(MS_DIRSYNC, fuser::MountOption::DirSync),
+             "lazytime"    => flag!(fs_context::MS_LAZYTIME),
+-            "mand"        => flag!(libc::MS_MANDLOCK),
+-            "noatime"     => flag!(libc::MS_NOATIME, fuser::MountOption::NoAtime),
+-            "nodev"       => flag!(libc::MS_NODEV, fuser::MountOption::NoDev),
+-            "nodiratime"  => flag!(libc::MS_NODIRATIME),
+-            "noexec"      => flag!(libc::MS_NOEXEC, fuser::MountOption::NoExec),
+-            "nosuid"      => flag!(libc::MS_NOSUID, fuser::MountOption::NoSuid),
+-            "relatime"    => flag!(libc::MS_RELATIME),
+-            "remount"     => flag!(libc::MS_REMOUNT),
+-            "ro"          => flag!(libc::MS_RDONLY, fuser::MountOption::RO),
++            "mand"        => flag!(MS_MANDLOCK),
++            "noatime"     => flag!(MS_NOATIME, fuser::MountOption::NoAtime),
++            "nodev"       => flag!(MS_NODEV, fuser::MountOption::NoDev),
++            "nodiratime"  => flag!(MS_NODIRATIME),
++            "noexec"      => flag!(MS_NOEXEC, fuser::MountOption::NoExec),
++            "nosuid"      => flag!(MS_NOSUID, fuser::MountOption::NoSuid),
++            "relatime"    => flag!(MS_RELATIME),
++            "remount"     => flag!(MS_REMOUNT),
++            "ro"          => flag!(MS_RDONLY, fuser::MountOption::RO),
+             "rw" | ""     => {}
+-            "strictatime" => flag!(libc::MS_STRICTATIME),
+-            "sync"        => flag!(libc::MS_SYNCHRONOUS, fuser::MountOption::Sync),
++            "strictatime" => flag!(MS_STRICTATIME),
++            "sync"        => flag!(MS_SYNCHRONOUS, fuser::MountOption::Sync),
+             // Userspace-only fstab options - not passed to the kernel:
+             "auto" | "noauto" | "nofail" | "_netdev"
+             | "user" | "nouser" | "users" | "group" | "owner" => {}
+@@ -539,8 +572,8 @@
+         let p = parse_mountflag_options("ro,noexec,metadata_replicas=2,norecovery");
+ 
+         assert_eq!(p.fs_opts.as_deref(), Some("metadata_replicas=2,norecovery"));
+-        assert_ne!(p.flags & libc::MS_RDONLY, 0);
+-        assert_ne!(p.flags & libc::MS_NOEXEC, 0);
++        assert_ne!(p.flags & MS_RDONLY, 0);
++        assert_ne!(p.flags & MS_NOEXEC, 0);
+     }
+ 
+     #[test]
+@@ -713,7 +746,7 @@
+                 // to be read-only to the VFS - or /proc/mounts says rw and the
+                 // user has only our word for it.
+                 if read_only {
+-                    flags |= libc::MS_RDONLY;
++                    flags |= MS_RDONLY;
+                 }
+                 a.ask = None;
+             }
