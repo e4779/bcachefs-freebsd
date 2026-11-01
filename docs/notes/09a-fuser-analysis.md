@@ -98,3 +98,76 @@ Rough total: fuser crate ≤5 lines; bcachefs-tools ~100-150 lines behind `cfg(t
 - tools/ @ bcachefs-tools clone (Cargo.toml/Cargo.lock fuser pin; src/commands/fusemount.rs)
 - hlab probes: `pkg info | rg fuse`, `pkg-config --modversion fuse3`, `which mount_fusefs fusermount3`
 - Upstream comparison: `git log up/master..HEAD`, `git show up/master:src/session.rs`
+
+
+## 6. Port patch design (T09 — fuser-porter, 2026-11-02)
+
+Implements §5's patch list as overlay patches 010-012, against pristine
+upstream @ d48ba1a. Verified: the three apply cleanly in sequence
+(`patch -p1`) and reproduce the authored trees byte-identically. NOT
+compiled — build forbidden for this task (Run 19c live in main checkout).
+
+### 010 — Cargo.toml: fuser features=["libfuse3"]
+Unconditional add (overlay only ever applied on FreeBSD). On Linux the
+feature swaps fuser's mount plumbing to libfuse3 there too (needs fuse3.pc)
+— for an upstream PR the shape is a `[target.'cfg(target_os="freebsd")']`
+section; kept unconditional here because cargo's cross-table feature merge
+couldn't be verified without a build.
+
+### 011 — fusemount.rs: n_threads=1 on FreeBSD (+ clone_fd=false)
+Mission option (i) — force 1 in fusemount.rs, not lift the fork's gate
+(session.rs:263; that's option (ii), follow-up). clone_fd is dropped too:
+FUSE_DEV_IOC_CLONE is Linux-only (fork channel.rs:59-88), nothing to clone
+with one thread. T12's metadata bench decides whether the single-thread
+cost matters.
+
+### 012 — fusemount.rs: FreeBSD device-mount path (§5.3 option (i))
+**Delegate the mount to fuser's libfuse3 backend** rather than nmount(2)
+ourselves: fuse_claim() returns None on FreeBSD, so device mounts go through
+fuse_serve()'s mount2 path exactly like image mounts (fuse_session_mount →
+mount_fusefs(8) — the fuse-ufs recipe). Rationale:
+- The Linux fuseblk mount's two jobs split apart: the EXCLUSIVE CLAIM has no
+  kernel counterpart on FreeBSD (no fuseblk), and the mount can't happen at
+  claim time anyway — fuser's Session::new needs the BcachefsFs, which
+  exists only after fs.start().
+- The claim is preserved in userspace: lock_devices()'s flock (all devices)
+  plus claim_devices()'s O_EXCL now covering **all** devices, source
+  included (&devs[1..] → &devs[..] under cfg). Probe 2026-11-02 (md-backed,
+  FreeBSD 15.1): same-process O_EXCL re-open after a plain open SUCCEEDS —
+  the Linux pattern ports unchanged.
+- mount_fuseblk()/fuse_unclaim() Linux bodies cfg'd out; fuse_unclaim keeps
+  an unreachable BSD stub (libc::unmount/MNT_FORCE) for the shared error
+  paths.
+- fuse_mounted(): no /proc/self/mountinfo on FreeBSD → getmntinfo(3) scan,
+  fstype fuse* + f_mntfromname == dev path. Best-effort: whether fsname=
+  (FSName already pushed by parse_fuse_mount_options) survives
+  libfuse3→mount_fusefs into f_mntfromname is a smoke item; a miss only
+  degrades lock_devices()'s fast "already in use" error to its 300s
+  WAIT_MAX arm.
+- MS_* flags: libc defines them Linux-only. fusemount.rs reads them via
+  `ms::` — cfg-alias to libc on Linux, local `mod msflags` with the
+  linux/fs.h ABI bits on FreeBSD (the word never reaches a kernel mount; it
+  is the interface to parse_mountflag_options).
+  ⚠ SCOPE RESIDUE: src/commands/mount.rs and src/fs_context.rs still spell
+  libc::MS_* (~35 sites) — the crate will NOT compile on FreeBSD until the
+  rust-port task unifies them on the same shim. Not fuse-transport scope.
+
+### Smoke items added (first vn-backed mount, beyond §5's list)
+- post-umount destroy race: FreeBSD umount doesn't wait for the
+  FUSE_DESTROY reply — remount/fsck immediately after umount can EBUSY-race
+  bch2_fs_exit()'s final writes (the race Linux accepts for image mounts).
+- fuse_mounted matching: after first mount, does f_mntfromname carry the
+  fsname=/device path?
+- mount_fusefs acceptance of dev/suid (MNT_NODEV/MNT_NOSUID negation),
+  allow_other + default_permissions as root.
+
+### Residual compile risks (not verified — no build allowed)
+- libc crate surface: getmntinfo/statfs/MNT_NOWAIT/MNT_FORCE/unmount for
+  freebsd (standard, high confidence).
+- cargo accepting `features` alongside the [patch.crates-io] git pin
+  (standard).
+
+### Merge note for orchestrator
+This file (09a) is committed on main (e12df78); this worktree branched
+before that (be51a70) and carries the same file plus §6 → add/add conflict
+at merge; resolution: take this branch's copy (superset).

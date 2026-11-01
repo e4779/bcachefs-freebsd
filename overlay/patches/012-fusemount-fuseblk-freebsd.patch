@@ -1,0 +1,212 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -71,6 +71,37 @@
+ use bcachefs_kernel::snapshots::subvolume;
+ 
+ use crate::util::AlignedBuf;
++
++// Linux mount(2) MS_* flag bits. libc defines them only for Linux targets;
++// on FreeBSD none of this reaches a kernel mount (fuser's libfuse3 backend
++// does the mounting, and the bits with a BSD meaning are translated there),
++// but the flag word is the currency shared with parse_mountflag_options()
++// (src/commands/mount.rs) and stored in FuseMount::Fuseblk, so the values
++// must be the linux/fs.h ABI bits. Kept complete even where this file
++// doesn't read the bit: they document the shared flag-word ABI, and making
++// mount.rs and fs_context.rs FreeBSD-compilable (they still spell libc::MS_*
++// directly - the rust-port task's, not the fuse transport's) will want the
++// same set.
++#[cfg(target_os = "freebsd")]
++#[allow(dead_code)]
++mod msflags {
++    pub const MS_RDONLY:      libc::c_ulong = 1;        // 1 << 0
++    pub const MS_NOSUID:      libc::c_ulong = 1 << 1;
++    pub const MS_NODEV:       libc::c_ulong = 1 << 2;
++    pub const MS_NOEXEC:      libc::c_ulong = 1 << 3;
++    pub const MS_SYNCHRONOUS: libc::c_ulong = 1 << 4;
++    pub const MS_REMOUNT:     libc::c_ulong = 1 << 5;
++    pub const MS_MANDLOCK:    libc::c_ulong = 1 << 6;
++    pub const MS_DIRSYNC:     libc::c_ulong = 1 << 7;
++    pub const MS_NOATIME:     libc::c_ulong = 1 << 10;
++    pub const MS_NODIRATIME:  libc::c_ulong = 1 << 11;
++    pub const MS_RELATIME:    libc::c_ulong = 1 << 21;
++    pub const MS_STRICTATIME: libc::c_ulong = 1 << 24;
++}
++#[cfg(target_os = "freebsd")]
++use self::msflags as ms;
++#[cfg(not(target_os = "freebsd"))]
++use libc as ms;
+ 
+ /// Guard that calls rcu_unregister_thread on drop (i.e. thread exit).
+ struct RcuGuard;
+@@ -554,14 +585,14 @@
+ impl AtimeOpts {
+     /// relatime unless told otherwise, as for a kernel mount:
+     fn from_ms_flags(flags: libc::c_ulong) -> Self {
+-        let mode = if flags & (libc::MS_NOATIME | libc::MS_RDONLY) != 0 {
++        let mode = if flags & (ms::MS_NOATIME | ms::MS_RDONLY) != 0 {
+             AtimeMode::Never
+-        } else if flags & libc::MS_STRICTATIME != 0 {
++        } else if flags & ms::MS_STRICTATIME != 0 {
+             AtimeMode::Strict
+         } else {
+             AtimeMode::Relative
+         };
+-        AtimeOpts { mode, nodiratime: flags & libc::MS_NODIRATIME != 0 }
++        AtimeOpts { mode, nodiratime: flags & ms::MS_NODIRATIME != 0 }
+     }
+ 
+     /// atime_needs_update() and relatime_need_update(): with relatime, only
+@@ -1812,7 +1843,7 @@
+ 
+     // read-only is both a fuser option (carried in parsed.fuse_options) and a
+     // filesystem-open concern - the latter isn't a mount flag, so set it here:
+-    if parsed.flags & libc::MS_RDONLY != 0 {
++    if parsed.flags & ms::MS_RDONLY != 0 {
+         bch_opts.set_read_only(true);
+     }
+ 
+@@ -1986,6 +2017,9 @@
+ /// two kinds of mount behave the same apart from unmount. That includes
+ /// allow_other with default_permissions, and nodev/nosuid only when asked for
+ /// - see parse_fuse_mount_options().
++// Linux-only: direct mount(2) of "fuseblk". FreeBSD has no fuseblk - see the
++// FreeBSD arm of fuse_claim() below for how device mounts go there instead.
++#[cfg(not(target_os = "freebsd"))]
+ fn mount_fuseblk(
+     source:     &Path,
+     mountpoint: &str,
+@@ -2021,6 +2055,24 @@
+ /// here. It does nothing against another fusemount (sget: see lock_devices()).
+ ///
+ /// Plain fuse has no such claim and mounts in fuse_serve(), via fuser.
++///
++/// FreeBSD has neither fuseblk nor a kernel claim on the source of a FUSE
++/// mount: the exclusivity that mount would provide comes from userspace
++/// instead - lock_devices()'s flock and claim_devices()'s O_EXCL open, both
++/// taken before Fs::open(), so before anything writes - and the mount itself
++/// is made by fuser's libfuse3 backend (fuse_session_mount -> mount_fusefs(8))
++/// in fuse_serve(), the same way as an image mount. Cost vs Linux: umount
++/// doesn't wait for our FUSE_DESTROY reply, so a remount or fsck right after
++/// can race bch2_fs_exit()'s last writes - the race Linux already accepts
++/// for image mounts.
++#[cfg(target_os = "freebsd")]
++fn fuse_claim(_fs: &Fs, _mountpoint: &str, _mount: &FuseMount) -> std::io::Result<Option<OwnedFd>> {
++    Ok(None)
++}
++
++/// The Linux shape of the claim: mount fuseblk ourselves, before the
++/// filesystem is started, and hand the /dev/fuse fd to fuse_serve().
++#[cfg(not(target_os = "freebsd"))]
+ fn fuse_claim(fs: &Fs, mountpoint: &str, mount: &FuseMount) -> std::io::Result<Option<OwnedFd>> {
+     let FuseMount::Fuseblk { source, ms_flags } = mount else {
+         return Ok(None);
+@@ -2034,10 +2086,22 @@
+ }
+ 
+ /// Detach a fuseblk mount nothing is going to serve.
++#[cfg(not(target_os = "freebsd"))]
+ fn fuse_unclaim(mountpoint: &str) {
+     let _ = rustix::mount::unmount(mountpoint, rustix::mount::UnmountFlags::DETACH);
+ }
+ 
++/// Unreachable on FreeBSD - fuse_claim() makes no mount, so there is nothing
++/// to detach - but the shared error paths in cmd_fusemount() and fuse_serve()
++/// call it, so it must exist. rustix's UnmountFlags are Linux-shaped; FreeBSD
++/// unmount(2) has no lazy MNT_DETACH, MNT_FORCE is the closest.
++#[cfg(target_os = "freebsd")]
++fn fuse_unclaim(mountpoint: &str) {
++    if let Ok(mp) = CString::new(mountpoint) {
++        let _ = unsafe { libc::unmount(mp.as_ptr(), libc::MNT_FORCE) };
++    }
++}
++
+ /// Serve until unmounted: on @fd from fuse_claim(), or, for plain fuse, on a
+ /// mount made here. Either way @bcachefs_fs - and with it the filesystem - is
+ /// gone by the time this returns.
+@@ -2147,6 +2211,32 @@
+ 
+ /// Whether @dev is the source of a mounted FUSE filesystem: the same block
+ /// device, or the same image file.
++#[cfg(target_os = "freebsd")]
++fn fuse_mounted(dev: &Path) -> bool {
++    // No /proc/self/mountinfo on FreeBSD: read the kernel's mount table with
++    // getmntinfo(3) - the same data mount(8) prints. Matching is
++    // best-effort: f_mntfromname is whatever the mount was given, and
++    // whether libfuse3's fsname= (MountOption::FSName, pushed in
++    // parse_fuse_mount_options()) survives into it is a smoke-test item. A
++    // miss only costs lock_devices() its fast "already in use" error - it
++    // falls to the WAIT_MAX arm - so this is error-path UX, not correctness.
++    let Some(dev) = dev.to_str() else { return false };
++    let name = |buf: &[u8]| match buf.iter().position(|&c| c == 0) {
++        Some(i) => String::from_utf8_lossy(&buf[..i]).into_owned(),
++        None => String::from_utf8_lossy(buf).into_owned(),
++    };
++    let mut mntbuf: *mut libc::statfs = std::ptr::null_mut();
++    let n = unsafe { libc::getmntinfo(&mut mntbuf, libc::MNT_NOWAIT) };
++    if n < 1 {
++        return false;
++    }
++    (0..n as usize).any(|i| {
++        let m = unsafe { &*mntbuf.add(i) };
++        name(&m.f_fstypename).starts_with("fuse") && name(&m.f_mntfromname) == dev
++    })
++}
++
++#[cfg(not(target_os = "freebsd"))]
+ fn fuse_mounted(dev: &Path) -> bool {
+     let same = |a: &std::fs::Metadata, b: &std::fs::Metadata| {
+         if a.file_type().is_block_device() && b.file_type().is_block_device() {
+@@ -2174,7 +2264,7 @@
+ 
+     // A remount has to reach the daemon already serving the mount; carrying
+     // on here would start a second filesystem on the same device instead.
+-    if ms_flags & libc::MS_REMOUNT != 0 {
++    if ms_flags & ms::MS_REMOUNT != 0 {
+         anyhow::bail!("{}: remounting a FUSE mount of bcachefs isn't supported yet; \
+                        unmount it and mount it again with the new options",
+                       cli.mountpoint);
+@@ -2201,7 +2291,16 @@
+         .map_err(|e| anyhow::anyhow!("Error opening filesystem: {}", e))?;
+ 
+     if let FuseMount::Fuseblk { .. } = &mount {
+-        held.extend(claim_devices(&devs[1..])?);
++        // FreeBSD: no fuseblk mount ever claims the source device for us, so
++        // O_EXCL every device, source included. Re-opening O_EXCL after
++        // Fs::open()'s plain opens in this same process works on FreeBSD
++        // (verified against specfs on FreeBSD 15.1) - the same pattern the
++        // Linux arm uses for the non-source devices.
++        #[cfg(target_os = "freebsd")]
++        let claim = &devs[..];
++        #[cfg(not(target_os = "freebsd"))]
++        let claim = &devs[1..];
++        held.extend(claim_devices(claim)?);
+     }
+ 
+     let mut config = Config::default();
+@@ -2423,7 +2522,7 @@
+             parse_fuse_mount_options("/dev/test", Some("ro,norecovery")).unwrap();
+ 
+         assert!(opts.read_only_or_default());
+-        assert!(ms_flags & libc::MS_RDONLY != 0);
++        assert!(ms_flags & ms::MS_RDONLY != 0);
+         assert!(mount_options.contains(&MountOption::RO));
+         assert!(mount_options.contains(&MountOption::FSName("/dev/test".to_string())));
+         assert!(mount_options.contains(&MountOption::CUSTOM("subtype=bcachefs".to_string())));
+@@ -2433,12 +2532,12 @@
+     fn atime_opts_follow_mount_flags() {
+         let mode = |f| AtimeOpts::from_ms_flags(f).mode;
+         assert_eq!(mode(0), AtimeMode::Relative);
+-        assert_eq!(mode(libc::MS_RELATIME), AtimeMode::Relative);
+-        assert_eq!(mode(libc::MS_STRICTATIME), AtimeMode::Strict);
+-        assert_eq!(mode(libc::MS_NOATIME), AtimeMode::Never);
++        assert_eq!(mode(ms::MS_RELATIME), AtimeMode::Relative);
++        assert_eq!(mode(ms::MS_STRICTATIME), AtimeMode::Strict);
++        assert_eq!(mode(ms::MS_NOATIME), AtimeMode::Never);
+         // read-only can't write an atime, whatever else was asked for:
+-        assert_eq!(mode(libc::MS_RDONLY | libc::MS_STRICTATIME), AtimeMode::Never);
+-        assert!(AtimeOpts::from_ms_flags(libc::MS_NODIRATIME).nodiratime);
++        assert_eq!(mode(ms::MS_RDONLY | ms::MS_STRICTATIME), AtimeMode::Never);
++        assert!(AtimeOpts::from_ms_flags(ms::MS_NODIRATIME).nodiratime);
+         assert!(!AtimeOpts::from_ms_flags(0).nodiratime);
+     }
+ 

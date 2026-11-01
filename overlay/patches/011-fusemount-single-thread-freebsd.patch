@@ -1,0 +1,20 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -2220,6 +2220,17 @@
+     // as we don't ask for FOPEN_PARALLEL_DIRECT_WRITES.)
+     config.n_threads = Some(std::thread::available_parallelism().map_or(4, |n| n.get()).min(16));
+     config.clone_fd = true;
++    // FreeBSD: fuser (koverstreet fork session.rs:261-268) rejects
++    // n_threads != 1 off Linux - its worker channels each get their own
++    // /dev/fuse fd via FUSE_DEV_IOC_CLONE, a Linux-only ioctl. Serve
++    // single-threaded for now; lifting the gate in the fork is follow-up
++    // work (the metadata bench will say whether it matters). clone_fd is
++    // that same ioctl - with one thread there is nothing to clone.
++    #[cfg(target_os = "freebsd")]
++    {
++        config.n_threads = Some(1);
++        config.clone_fd = false;
++    }
+ 
+     if cli.foreground {
+         shrinkers_init();
