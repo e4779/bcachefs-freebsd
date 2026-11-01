@@ -1,0 +1,12 @@
+--- a/src/commands/attr.rs
++++ b/src/commands/attr.rs
+@@ -80,7 +80,8 @@
+                 }
+             }
+             #[cfg(target_os = "freebsd")]
+-            match rustix::fs::fstatat(dir, name, AtFlags::SYMLINK_NOFOLLOW) {
++            // rustix names it statat(); fstatat is only a doc alias.
++            match rustix::fs::statat(dir, name, AtFlags::SYMLINK_NOFOLLOW) {
+                 Ok(st) if st.st_dev != mnt_dev => continue,
+                 Ok(_) => {}
+                 Err(e) => {
