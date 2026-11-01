@@ -91,3 +91,6 @@ Follow-up после Run 18: промоутнуть EREMOTEIO/EBADE/EREMCHG в `
 
 ### Шестёрка шимов — OK (14:29)
 Все 6 объектов linux/ собрались; merge 7d21efc (patch-shims) + f542fde (patch-bio) + errno-промоушен. Run 19 (полный, -j1, rctl 2500) запущен; mem free=367MB+inactive=1852MB — ниже гейта, но inactive reclaimable + кэп, отклонение фиксирую здесь.
+
+### ETIME-реставрация (orchestrator)
+Мерж-инцидент: git checkout -- сбросил ГРЯЗНЫЙ freebsd_compat.h, содержавший НЕКОММИЧЕННЫЙ ETIME-фикс v2 (+ надписи patch-shims в том же файле); ветка patch-shims ответвилась до него — merge принёс версию без ETIME (Run 19b упал на closure.c). Урок: грязный файл в main может быть чьей-то незакоммиченной работой — перед checkout -- диффать и сохранять; агент обязан коммитить код до конца рана (v2 нарушил). Фикс восстановлен по журнальной специкации Run 15.
