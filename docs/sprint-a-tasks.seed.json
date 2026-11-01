@@ -1,0 +1,15 @@
+[
+  {"id": "T01", "title": "clone koverstreet/bcachefs-tools into tools/", "detail": "git clone https://github.com/koverstreet/bcachefs-tools tools/ (full history for future rebases); record HEAD hash in docs/notes/01a-clone.md", "dependencies": []},
+  {"id": "T02", "title": "deps audit: tools vs FreeBSD ports", "detail": "Read INSTALL.md + Makefile*; produce table dep->port/missing/stub; write docs/notes/02a-deps.md", "dependencies": ["T01"]},
+  {"id": "T03", "title": "install build deps via pkg (user-approved list)", "detail": "Base list: pkgconf liburcu e2fsprogs-libuuid lz4 fusefs-libs3 pjdfstest + T02 additions. ORCHESTRATOR-ONLY (needs user approval)", "dependencies": ["T02"]},
+  {"id": "T04", "title": "build C core (gmake), patch breakage into overlay/", "detail": "gmake; every failure -> minimal patch in overlay/, log docs/notes/04a-build-c.md; keyutils likely stubbed", "dependencies": ["T03"]},
+  {"id": "T05", "title": "cargo build (Rust side incl. fuser fork fetch)", "detail": "cargo build --features default; log docs/notes/05a-build-rust.md", "dependencies": ["T03"]},
+  {"id": "T06", "title": "test image: mdconfig vnode 2G + bcachefs format (our build)", "detail": "truncate -s 2G tmp/test.img; mdconfig -t vnode -f; ./bcachefs format --label test /dev/mdN; record in docs/notes/06a-testfs.md", "dependencies": ["G0"]},
+  {"id": "T07", "title": "fsck roundtrip on test image", "detail": "fsck clean; fill->fsync->fsck->readback->verify loop x3; log docs/notes/07a-fsck.md", "dependencies": ["T06"]},
+  {"id": "T08", "title": "kernel FUSE smoke via fuse-ufs port (control)", "detail": "kldload fusefs; pkg-installed fusefs-ufs mounts a UFS image read-only; proves kernel side without our code; log docs/notes/08a-fuse-ctrl.md", "dependencies": ["T03"]},
+  {"id": "T09", "title": "port Kent's fuser fork: build with libfuse feature on FreeBSD", "detail": "fuser (koverstreet/fuser@destroy-before-reply) with feature libfuse against fusefs-libs3; patches -> overlay/fuser/*; deviations from fuse-ufs recipe recorded; log docs/notes/09a-fuser.md", "dependencies": ["T03"]},
+  {"id": "T10", "title": "FUSE ro-mount of test fs + traversal + pjdfstest(ro)", "detail": "./bcachefs mount -o fuse,ro /dev/mdN tmp/mnt; find/tar traversal; pjdfstest read-only group; log docs/notes/10a-fuse-ro.md", "dependencies": ["G1", "T08", "T09"]},
+  {"id": "T11", "title": "FUSE rw on TEST fs only: pjdfstest full + hardlink-farm simulation", "detail": "NEVER live pool; create/link/rename storm pattern of ed2k farms; log docs/notes/11a-fuse-rw.md", "dependencies": ["T10"]},
+  {"id": "T12", "title": "bench harness + run on FUSE mount", "detail": "bench/: sync-create, rename-storm, deep-readdir, seq r/w; run x5 iterations; log docs/notes/12a-bench-run.md", "dependencies": ["G2"]},
+  {"id": "T13", "title": "bench report vs bridge numbers", "detail": "docs/notes/bench-2026-11.md: bridge 12.8ms/file vs sshfs 1.2ms vs ours; verdict vs G3", "dependencies": ["T12"]}
+]
