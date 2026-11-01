@@ -46,3 +46,16 @@
 #endif
 
 #endif
+
+/* Linux-only errno names FreeBSD lacks; promoted from bio.c-local defines
+ * (patch 006) — bch-internal error mapping only, never cross a host syscall. */
+#ifndef EBADE
+#define EBADE		52	/* Invalid exchange */
+#endif
+#ifndef EREMOTEIO
+#define EREMOTEIO	121	/* Remote I/O error */
+#endif
+#ifndef EREMCHG
+#define EREMCHG		78	/* Remote address changed */
+#endif
+
