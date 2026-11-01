@@ -94,3 +94,6 @@ Follow-up после Run 18: промоутнуть EREMOTEIO/EBADE/EREMCHG в `
 
 ### ETIME-реставрация (orchestrator)
 Мерж-инцидент: git checkout -- сбросил ГРЯЗНЫЙ freebsd_compat.h, содержавший НЕКОММИЧЕННЫЙ ETIME-фикс v2 (+ надписи patch-shims в том же файле); ветка patch-shims ответвилась до него — merge принёс версию без ETIME (Run 19b упал на closure.c). Урок: грязный файл в main может быть чьей-то незакоммиченной работой — перед checkout -- диффать и сохранять; агент обязан коммитить код до конца рана (v2 нарушил). Фикс восстановлен по журнальной специкации Run 15.
+
+### Run 19d — C готов, Rust-слой: 93 ошибки (карта владения)
+bch_bindgen: keyutils .pc решён (286), новая паника позже (rust-compat диагностирует). Файловая карта: fusemount.rs 21 (fuser-porter), mount.rs 19 + fs_context 17 + copy_fs 11 + wrappers 12 + attr 6 + misc 7 = 72 (rust-compat). Классы: rustix xattr/statx/mount (cfg linux_kernel), libc MS_*/sysinfo/Ioctl/O_NOATIME, std::os::linux. FreeBSD-эквиваленты спроектированы в задании rust-compat (extattr, nmount, DIOCGMEDIASIZE, sysctl).

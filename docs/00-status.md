@@ -19,7 +19,7 @@
 | T02 аудит deps | ✅ | orchestrator | notes/02a (8/10 было)
 | T03 pkg | ✅ | orchestrator (+owner) | 6 пакетов, notes/00a
 | T04 сборка C | 🏃 113+/~500 объектов + все 6 linux/-шимов собраны; Run 19b линкует | orchestrator/buildslot + patch-bio (f542fde) + patch-shims (merge 7d21efc) | notes/04a, overlay/patches 001-009
-| T05 cargo | частично в Run 19b (gmake гоняет cargo сам; cstruct-стемп уже был) | — | —
+| T05 cargo | 🏃 rust-compat: 72/93 Rust-ошибок (mount/fs_context/copy_fs/wrappers/attr) + bch_bindgen паника; fusemount.rs 21 — у fuser-porter (T09) | rust-compat + fuser-porter | build-19.log; notes/05a
 | T06 образ | скрипт готов (scripts/mk-test-fs.sh) | — | —
 | T07 fsck | скрипт готов (clean/fill режимы) | — | —
 | T08 контроль FUSE | скрипт готов; нужен порт fusefs-ufs (не в одобренном списке — спросить owner) | — | scripts/control-fuse-test.sh
