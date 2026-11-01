@@ -39,6 +39,9 @@ Linux build takes from glibc/UAPI); modifications of upstream files are
 | `patches/007-blkdev-alloca-freebsd.patch` | patch | blkdev.c: alloca.h is glibc-only; FreeBSD takes alloca(3) from stdlib.h |
 | `patches/008-gettid-thr-self-freebsd.patch` | patch | kthread.c/sched.c: syscall(SYS_gettid) → bch_gettid() (thr_self(2); pid feeds only backtraces/debug) |
 | `patches/009-shrinker-listhead-freebsd.patch` | patch | shrinker.c: CDS_LIST_HEAD — sidesteps the LIST_HEAD(name,type) redefinition from sys/queue.h |
+| `patches/010-cargo-fuser-libfuse3-freebsd.patch` | patch | Cargo.toml: fuser dep +libfuse3 feature — mounting via fusefs-libs3/mount_fusefs(8); FreeBSD has no fusermount(8), so fuser's pure-rust backend can't mount |
+| `patches/011-fusemount-single-thread-freebsd.patch` | patch | fusemount.rs: n_threads=1, clone_fd=false on FreeBSD — fuser rejects n_threads!=1 off Linux; FUSE_DEV_IOC_CLONE fd cloning is Linux-only |
+| `patches/012-fusemount-fuseblk-freebsd.patch` | patch | fusemount.rs: FreeBSD has no fuseblk — device mounts go through fuser's libfuse3 path like image mounts; O_EXCL claims on ALL devices (no kernel claim); MS_* flag shim; getmntinfo() replaces /proc/self/mountinfo |
 
 ## Runtime semantics notes
 
