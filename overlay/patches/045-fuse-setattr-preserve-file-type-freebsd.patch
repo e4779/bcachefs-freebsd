@@ -1,0 +1,18 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -453,7 +453,13 @@
+             let mut inode_u =
+                 inode::peek(t, &mut iter, inum, btree::iter::BtreeIterFlags::INTENT)?;
+ 
+             if let Some(mode) = mode {
+-                inode_u.bi_mode = mode;
++                // FUSE_SETATTR's mode carries chmod(2)'s argument -
++                // permission bits only.  Merge, never overwrite: writing
++                // the whole bi_mode zeroed S_IFDIR, the attrs reply then
++                // reported a regular file, and fusefs(4) answers a
++                // type-flipping setattr with ENOENT while the inode stays
++                // corrupted on disk (fsck: dirent_d_type_wrong).
++                inode_u.bi_mode = (inode_u.bi_mode & !0o7777) | (mode & 0o7777);
+             }
+             if let Some(uid) = uid {
+                 inode_u.bi_uid = uid;
