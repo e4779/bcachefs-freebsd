@@ -86,4 +86,13 @@ static inline pid_t bch_gettid(void)
 	return (pid_t)tid;
 }
 
+/*
+ * No MAP_NORESERVE on FreeBSD: there is no per-mapping overcommit accounting
+ * to disable, so "reserve address space, commit on first fault" - all
+ * linux/percpu.c wants from its chunk mmap - is the default behaviour.
+ */
+#ifndef MAP_NORESERVE
+#define MAP_NORESERVE 0
+#endif
+
 #endif /* _BCACHEFS_TOOLS_FREEBSD_COMPAT_H */
