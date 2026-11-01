@@ -45,6 +45,8 @@ typedef uint32_t key_perm_t;
 
 key_serial_t add_key(const char *type, const char *description,
 		     const void *payload, size_t plen, key_serial_t ring);
+key_serial_t request_key(const char *type, const char *description,
+			 const char *callout_info, key_serial_t dest);
 long keyctl(int cmd, ...);
 key_serial_t keyctl_search(key_serial_t ring, const char *type,
 			   const char *description, key_serial_t dest);

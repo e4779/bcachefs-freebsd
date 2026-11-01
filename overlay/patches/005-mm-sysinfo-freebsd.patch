@@ -1,0 +1,40 @@
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -29,10 +29,36 @@
+ 	char _f[20 - 2 * sizeof(unsigned long) - sizeof(__u32)];
+ };
+ 
++#ifdef __FreeBSD__
++#include <string.h>
++#include <sys/sysctl.h>
++/* FreeBSD has no sysinfo(2): approximate with sysctl. Every consumer in
++ * this tree (si_mem_available, shrinker pressure, btree cache sizing) uses
++ * the numbers as heuristics, not accounting. */
+ static inline void si_meminfo(struct sysinfo *val)
+ {
++	size_t len;
++
++	memset(val, 0, sizeof(*val));
++	len = sizeof(val->totalram);
++	sysctlbyname("hw.physmem", &val->totalram, &len, NULL, 0);
++
++	unsigned int page_size = 0, free_ct = 0, inactive_ct = 0;
++	len = sizeof(page_size);
++	sysctlbyname("vm.stats.vm.v_page_size", &page_size, &len, NULL, 0);
++	len = sizeof(free_ct);
++	sysctlbyname("vm.stats.vm.v_free_count", &free_ct, &len, NULL, 0);
++	len = sizeof(inactive_ct);
++	sysctlbyname("vm.stats.vm.v_inactive_count", &inactive_ct, &len, NULL, 0);
++	val->freeram = (unsigned long)(free_ct + inactive_ct) * page_size;
++	val->mem_unit = 1;
++}
++#else
++static inline void si_meminfo(struct sysinfo *val)
++{
+ 	BUG_ON(syscall(SYS_sysinfo, val));
+ }
++#endif
+ 
+ extern unsigned long _totalram_pages;
+ static inline unsigned long totalram_pages(void)
+

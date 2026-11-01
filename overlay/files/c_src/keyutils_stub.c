@@ -23,6 +23,13 @@ key_serial_t add_key(const char *type, const char *description,
 	return keyutils_enosys();
 }
 
+key_serial_t request_key(const char *type, const char *description,
+			   const char *callout_info, key_serial_t dest)
+{
+	(void)type; (void)description; (void)callout_info; (void)dest;
+	return keyutils_enosys();
+}
+
 key_serial_t keyctl_search(key_serial_t ring, const char *type,
 			   const char *description, key_serial_t dest)
 {

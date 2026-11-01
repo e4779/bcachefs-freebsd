@@ -1,0 +1,34 @@
+--- a/include/linux/bitops.h
++++ b/include/linux/bitops.h
+@@ -242,11 +242,18 @@
+ 	return (sizeof(word) * 8) - 1 - __builtin_clzl(word);
+ }
+ 
++#ifndef __FreeBSD__
+ static inline int fls(int x)
+ {
+ 	return x ? sizeof(x) * 8 - __builtin_clz(x) : 0;
+ }
++#else
++/* FreeBSD's libc fls() (<strings.h>) has identical semantics; a local
++ * static would collide with its declaration. */
++#include <strings.h>
++#endif
+ 
++#ifndef __FreeBSD__
+ static inline int fls64(__u64 x)
+ {
+ #if BITS_PER_LONG == 32
+@@ -260,6 +267,11 @@
+ 	return __fls(x) + 1;
+ #endif
+ }
++#else
++/* FreeBSD's flsll() is fls64 with the same numbering. */
++#include <strings.h>
++#define fls64(x)	flsll(x)
++#endif
+ 
+ static inline unsigned fls_long(unsigned long l)
+ {
+
