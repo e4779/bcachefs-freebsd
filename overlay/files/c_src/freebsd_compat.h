@@ -96,3 +96,12 @@ static inline pid_t bch_gettid(void)
 #endif
 
 #endif /* _BCACHEFS_TOOLS_FREEBSD_COMPAT_H */
+
+/* FreeBSD errno.h lacks ETIME (only ETIMEDOUT=60); closure.c includes
+ * <errno.h> directly, so the linux/errno.h shadow is not visible there.
+ * Linux number, bch-internal error mapping only (restored after merge
+ * accident — was v2's uncommitted fix, see 04a Run 15). */
+#ifndef ETIME
+#define ETIME		62
+#endif
+
