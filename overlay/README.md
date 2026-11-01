@@ -54,13 +54,13 @@ Linux build takes from glibc/UAPI); modifications of upstream files are
   encrypted filesystems, which the test-FS plan does not use.
 
 | `src/bsd_compat.rs` | file | Rust-side FreeBSD shims: Linux MS_* flag values + ms_to_mnt(), IoctlRequest alias, xattr(2)→extattr(2) helpers (user-namespace mapping; list-format rewrite) |
-| `patches/010-rust-bsd-compat-module.patch` | patch | declare mod bsd_compat in src/bcachefs.rs (cfg freebsd) |
-| `patches/011-wrappers-ioctl-request-type.patch` | patch | wrappers: libc::Ioctl → IoctlRequest alias (libc crate has no Ioctl on FreeBSD) |
-| `patches/012-attr-freebsd-xattr.patch` | patch | attr.rs: xattr→extattr, statx(MNT_ID)→fstat/st_dev mount check, ENOATTR arm |
-| `patches/013-plymouth-freebsd-stub.patch` | patch | plymouth connect() → ENOENT (no abstract sockets / no plymouth on FreeBSD) |
-| `patches/014-format-util-physmem.patch` | patch | sysinfo(2) → sysctl hw.physmem |
-| `patches/015-migrate-noatime.patch` | patch | drop Linux-only O_NOATIME open flag |
-| `patches/016-fs-context-freebsd.patch` | patch | fs_context: MS_* shims; SYS_fs*/MOVE_MOUNT placeholders — syscall(-1)→ENOSYS → designed Ok(None) fallback |
-| `patches/017-mount-legacy-freebsd.patch` | patch | mount.rs: MS_* shims; 4-arg MNT_* mount(2) arm (kernel mount → honest ENODEV) |
-| `patches/018-copy-fs-freebsd.patch` | patch | copy_fs: llistxattr/lgetxattr→extattr, mode_t u16 casts, no O_NOATIME, syncfs→fsync |
-| `patches/019-util-statx-freebsd.patch` | patch | util.rs path_subvol → None (STATX_SUBVOL is a Linux statx extension) |
+| `patches/020-rust-bsd-compat-module.patch` | patch | declare mod bsd_compat in src/bcachefs.rs (cfg freebsd) |
+| `patches/021-wrappers-ioctl-request-type.patch` | patch | wrappers: libc::Ioctl → IoctlRequest alias (libc crate has no Ioctl on FreeBSD) |
+| `patches/022-attr-freebsd-xattr.patch` | patch | attr.rs: xattr→extattr, statx(MNT_ID)→fstat/st_dev mount check, ENOATTR arm |
+| `patches/023-plymouth-freebsd-stub.patch` | patch | plymouth connect() → ENOENT (no abstract sockets / no plymouth on FreeBSD) |
+| `patches/024-format-util-physmem.patch` | patch | sysinfo(2) → sysctl hw.physmem |
+| `patches/025-migrate-noatime.patch` | patch | drop Linux-only O_NOATIME open flag |
+| `patches/026-fs-context-freebsd.patch` | patch | fs_context: MS_* shims; SYS_fs*/MOVE_MOUNT placeholders — syscall(-1)→ENOSYS → designed Ok(None) fallback |
+| `patches/027-mount-legacy-freebsd.patch` | patch | mount.rs: MS_* shims; 4-arg MNT_* mount(2) arm (kernel mount → honest ENODEV) |
+| `patches/028-copy-fs-freebsd.patch` | patch | copy_fs: llistxattr/lgetxattr→extattr, mode_t u16 casts, no O_NOATIME, syncfs→fsync |
+| `patches/029-util-statx-freebsd.patch` | patch | util.rs path_subvol → None (STATX_SUBVOL is a Linux statx extension) |
