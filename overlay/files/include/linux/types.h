@@ -8,6 +8,7 @@
  * expands to nothing unless sparse (__CHECKER__) runs.
  */
 #include <asm/types.h>
+#include <asm/bitsperlong.h>
 
 #ifndef __ASSEMBLY__
 
@@ -24,8 +25,17 @@ typedef __u32 __bitwise __be32;
 typedef __u64 __bitwise __le64;
 typedef __u64 __bitwise __be64;
 
+typedef unsigned short umode_t;
+
 typedef __u16 __bitwise __sum16;
 typedef __u32 __bitwise __wsum;
+
+/* kernel UAPI <linux/stddef.h>'s flex-array helper, as glibc userspace sees it */
+#define __DECLARE_FLEX_ARRAY(TYPE, NAME)	\
+	struct {				\
+		struct { } __empty_ ## NAME;	\
+		TYPE NAME[];			\
+	} NAME
 
 #define __aligned_u64	__u64 __attribute__((aligned(8)))
 #define __aligned_be64	__be64 __attribute__((aligned(8)))

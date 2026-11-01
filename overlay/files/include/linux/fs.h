@@ -3,23 +3,22 @@
 #define _FREEBSD_LINUX_FS_SHADOW_H
 /*
  * glibc's <linux/fs.h> is kernel UAPI; the userspace build uses it for the
- * block-device ioctls. On FreeBSD the geom(4) DIOCG* ioctls cover the
- * same ground with argument shapes that match (pointer to 64-bit /
- * pointer to unsigned int), so the Linux names alias onto them.
+ * block-device ioctls. The FreeBSD geom(4) DIOCG* ioctls cover the same
+ * ground with matching argument shapes (pointer to 64-bit / unsigned).
  *
- * BLKPBSZGET has no direct FreeBSD equivalent (physical block size);
- * DIOCGSECTORSIZE is the sane approximation. BLKROTATIONAL has none at
- * all: keep the Linux x86-64 encoding so the constant exists for the Rust
- * export in c_src/rust_shims.h - the ioctl itself answers ENOTTY and the
- * caller must cope (probe falls back to "unknown").
+ * The numbers are spelled out, not derived: <sys/disk.h> drags
+ * sys/kerneldump.h -> sys/conf.h (2-arg LIST_HEAD vs the tree's linux
+ * list.h), and _IOR() itself must stay the Linux encoding for bcachefs's
+ * own ioctl ABI - see include/asm/ioctl.h. Values verified against
+ * sys/disk.h on FreeBSD 15.1 amd64:
+ *
+ *	DIOCGMEDIASIZE	_IOR('d', 129, off_t)  = 0x40086481
+ *	DIOCGSECTORSIZE	_IOR('d', 128, u_int)  = 0x40046480
  */
-#include <sys/disk.h>		/* DIOCGMEDIASIZE, DIOCGSECTORSIZE */
-#include <sys/ioctl.h>
+#define BLKGETSIZE64	0x40086481U		/* u64* <- off_t* bytes */
+#define BLKSSZGET	0x40046480U		/* int*  <- u_int* */
+#define BLKPBSZGET	0x40046480U		/* approximation: no PBSZ ioctl */
 
-#define BLKGETSIZE64	DIOCGMEDIASIZE		/* u64* <- off_t* (bytes) */
-#define BLKSSZGET	DIOCGSECTORSIZE		/* int*  <- u_int* */
-#define BLKPBSZGET	DIOCGSECTORSIZE		/* approximation */
-
-#define BLKROTATIONAL	0x1280			/* _IO(0x12,128); ENOTTY here */
+#define BLKROTATIONAL	0x1280	/* Linux _IO(0x12,128); answers ENOTTY here */
 
 #endif
