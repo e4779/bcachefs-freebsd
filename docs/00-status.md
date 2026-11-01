@@ -8,7 +8,7 @@
 |---|---|---|
 | G0 | `tools/bcachefs version` на FreeBSD | ✅ **v1.39.7-1539-gd48ba1a7a1d0-dirty** (Run 24, 131MB binary, 16:20)
 | G1 | format→fsck→fill→verify | ✅ format + полный offline fsck чисто (fill→verify в T11). Корни: 041 PAGE_MASK, 042 bdev-fstat, 043 mmap fd=-1, futex-арги |
-| G2 | FUSE rw тест-ФС | 🏃 core-семантика rw ЗЕЛЁНАЯ (write/hardlink nlink=2/rename-over/unlink + fsck clean, journal seq 51); остаток: pjdfstest паникует на FUSE (на ZFS здоров) + один inode_unreachable-след; bisect-fuse копает |
+| G2 | FUSE rw тест-ФС | 🏃 убийца pjdfstest найден и пофиксен (045: chmod затирал S_IFDIR → ENOENT + порча; bisect-fuse); Run 28 пересобирает → полный прогон на свежей ФС |
 | G3 | метаданные лучше 12.8 мс/файл моста | ожидает G2
 
 ## Задачи
