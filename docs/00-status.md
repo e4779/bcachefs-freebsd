@@ -8,7 +8,7 @@
 |---|---|---|
 | G0 | `tools/bcachefs version` на FreeBSD | ✅ **v1.39.7-1539-gd48ba1a7a1d0-dirty** (Run 24, 131MB binary, 16:20)
 | G1 | format→fsck→fill→verify | ✅ format + полный offline fsck чисто (fill→verify в T11). Корни: 041 PAGE_MASK, 042 bdev-fstat, 043 mmap fd=-1, futex-арги |
-| G2 | FUSE rw тест-ФС + pjdfstest | ожидает G1
+| G2 | FUSE rw тест-ФС | 🏃 T11 (rw mount + хардлинк-ферма). T10 ✅: первый bcachefs-маунт на FreeBSD (ro, umount+fsck чисты) |
 | G3 | метаданные лучше 12.8 мс/файл моста | ожидает G2
 
 ## Задачи
@@ -23,7 +23,7 @@
 | T06 образ | скрипт готов (scripts/mk-test-fs.sh) | — | —
 | T07 fsck | скрипт готов (clean/fill режимы) | — | —
 | T08 контроль FUSE | скрипт готов; нужен порт fusefs-ufs (не в одобренном списке — спросить owner) | — | scripts/control-fuse-test.sh
-| T09 fuser-форк | ✅ патчи 010-012 (251 LOC, fuseblk BSD-ветка, fuse_claim→Ok(None) делегат libfuse3) — | лекало fuse-ufs
+| T09 fuser-форк | ✅ работает в бою (T10) | — | лекало fuse-ufs
 | T10/T11 FUSE mount+rw | скрипты-обёртки готовы | — | —\n| T12 bench | каркас готов (bench/*) | — | планка: 12.8 мс/файл
 
 ## Оркестрационные константы (уроки)
