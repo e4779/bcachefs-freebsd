@@ -1,0 +1,159 @@
+--- a/src/commands/attr.rs
++++ b/src/commands/attr.rs
+@@ -6,9 +6,22 @@
+ use anyhow::{anyhow, bail, Context, Result};
+ use bch_bindgen::c;
+ use clap::{Arg, ArgAction, Command};
++#[cfg(target_os = "linux")]
+ use rustix::fs::{openat, removexattr, setxattr, statx, AtFlags, Dir, FileType, Mode, OFlags, StatxFlags,
+                  XattrFlags};
++// statx and the xattr calls are Linux-only in rustix; the FreeBSD arms below
++// detect mount boundaries with fstatat(st_dev) and speak extattr(2) through
++// bsd_compat.
++#[cfg(target_os = "freebsd")]
++use rustix::fs::{openat, AtFlags, Dir, FileType, Mode, OFlags};
+ 
++// libc::Ioctl — the request-argument type of ioctl(2) — exists only in the
++// Linux libc crate; FreeBSD's ioctl(2) takes the same unsigned long.
++#[cfg(target_os = "linux")]
++use libc::Ioctl as IoctlRequest;
++#[cfg(target_os = "freebsd")]
++use crate::bsd_compat::IoctlRequest;
++
+ use super::opts;
+ 
+ use crate::wrappers::ioctl::{ioctl_none, Ioctl,
+@@ -23,7 +36,13 @@
+ /// it saw the directory the mount covers.
+ fn propagate_recurse(dir: &OwnedFd, path: &Path) -> usize {
+     let walk = || -> rustix::io::Result<usize> {
++        #[cfg(target_os = "linux")]
+         let mnt_id = statx(dir, "", AtFlags::EMPTY_PATH, StatxFlags::MNT_ID)?.stx_mnt_id;
++        // FreeBSD: no statx(STATX_MNT_ID); st_dev changes at exactly the
++        // same boundary a mount id would, so it answers the same "did we
++        // cross into another filesystem" question.
++        #[cfg(target_os = "freebsd")]
++        let mnt_dev = rustix::fs::fstat(dir)?.st_dev;
+         let mut failed = 0;
+         let report = |name: &CStr, e: &dyn std::fmt::Display| {
+             eprintln!("{}: {e}", path.join(OsStr::from_bytes(name.to_bytes())).display());
+@@ -41,7 +60,7 @@
+             // The argument is the name's address itself, not a pointer to it
+             // SAFETY: a NUL-terminated name, which the kernel only reads
+             let ret = unsafe {
+-                libc::ioctl(dir.as_raw_fd(), BCHFS_IOC_REINHERIT_ATTRS::OPCODE as libc::Ioctl, name.as_ptr())
++                libc::ioctl(dir.as_raw_fd(), BCHFS_IOC_REINHERIT_ATTRS::OPCODE as IoctlRequest, name.as_ptr())
+             };
+             if ret < 0 {
+                 failed += report(name, &std::io::Error::last_os_error());
+@@ -51,6 +70,7 @@
+                 continue;
+             }
+ 
++            #[cfg(target_os = "linux")]
+             match statx(dir, name, AtFlags::SYMLINK_NOFOLLOW | AtFlags::NO_AUTOMOUNT, StatxFlags::MNT_ID) {
+                 Ok(stx) if stx.stx_mnt_id != mnt_id => continue,
+                 Ok(_) => {}
+@@ -59,6 +79,15 @@
+                     continue;
+                 }
+             }
++            #[cfg(target_os = "freebsd")]
++            match rustix::fs::fstatat(dir, name, AtFlags::SYMLINK_NOFOLLOW) {
++                Ok(st) if st.st_dev != mnt_dev => continue,
++                Ok(_) => {}
++                Err(e) => {
++                    failed += report(name, &e);
++                    continue;
++                }
++            }
+             match openat(dir, name, OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+                          Mode::empty()) {
+                 Ok(child) => {
+@@ -77,12 +106,24 @@
+ }
+ 
+ fn remove_bcachefs_attr(path: &Path, attr_name: &str) {
++    #[cfg(target_os = "linux")]
+     if let Err(e) = removexattr(path, attr_name) {
+         if e != rustix::io::Errno::NODATA && e != rustix::io::Errno::INVAL {
+             eprintln!("error removing attribute {} from {}: {}",
+                 attr_name, path.display(), e);
+         }
+     }
++    // FreeBSD: extattr_delete_file; ENOATTR is FreeBSD's ENODATA (option
++    // unset) and is the expected case when clearing.
++    #[cfg(target_os = "freebsd")]
++    if let Err(e) = crate::bsd_compat::removexattr(path, attr_name) {
++        if e.raw_os_error() != Some(libc::ENOATTR)
++            && e.raw_os_error() != Some(libc::EINVAL)
++        {
++            eprintln!("error removing attribute {} from {}: {}",
++                attr_name, path.display(), e);
++        }
++    }
+ }
+ 
+ /// @opts set on @path, and if it's a directory, reinherited down it: how
+@@ -114,7 +155,13 @@
+         if value == "-" {
+             remove_bcachefs_attr(path, &attr);
+         } else {
++            #[cfg(target_os = "linux")]
+             setxattr(path, &attr, value.as_bytes(), XattrFlags::empty())
++                .with_context(|| format!("setting {} on {}", attr, path.display()))?;
++            // extattr_set_file has no CREATE/REPLACE distinction — it always
++            // writes, which is what XattrFlags::empty() asks for.
++            #[cfg(target_os = "freebsd")]
++            crate::bsd_compat::setxattr(path, &attr, value.as_bytes())
+                 .with_context(|| format!("setting {} on {}", attr, path.display()))?;
+         }
+     }
+@@ -127,18 +174,37 @@
+ }
+ 
+ fn read_bcachefs_attr(path: &Path, attr: &str) -> Result<Option<String>> {
+-    use rustix::fs::getxattr;
+-    use rustix::io::Errno;
++    #[cfg(target_os = "linux")]
++    let read = {
++        use rustix::fs::getxattr;
++        use rustix::io::Errno;
+ 
+-    // "no value here" rather than an error: NODATA (option unset), NOTSUP (not
+-    // a bcachefs filesystem), INVAL (not a recognized option).
+-    let read = |buf: &mut [u8]| -> Result<Option<usize>> {
+-        match getxattr(path, attr, buf) {
+-            Ok(len) => Ok(Some(len)),
+-            Err(Errno::NODATA | Errno::NOTSUP | Errno::INVAL) => Ok(None),
+-            Err(e) => Err(e).with_context(|| format!("reading {attr} from {}", path.display())),
+-        }
++        // "no value here" rather than an error: NODATA (option unset), NOTSUP
++        // (not a bcachefs filesystem), INVAL (not a recognized option).
++        let read = |buf: &mut [u8]| -> Result<Option<usize>> {
++            match getxattr(path, attr, buf) {
++                Ok(len) => Ok(Some(len)),
++                Err(Errno::NODATA | Errno::NOTSUP | Errno::INVAL) => Ok(None),
++                Err(e) => Err(e).with_context(|| format!("reading {attr} from {}", path.display())),
++            }
++        };
++        read
+     };
++    #[cfg(target_os = "freebsd")]
++    let read = {
++        // FreeBSD: extattr(2) via bsd_compat. ENOATTR is FreeBSD's ENODATA;
++        // EOPNOTSUPP (xattrs not supported by this filesystem) and EINVAL
++        // (not a recognized option) as on Linux.
++        let read = |buf: &mut [u8]| -> Result<Option<usize>> {
++            match crate::bsd_compat::getxattr(path, attr, buf) {
++                Ok(len) => Ok(Some(len)),
++                Err(e) if matches!(e.raw_os_error(),
++                    Some(libc::ENOATTR) | Some(libc::EOPNOTSUPP) | Some(libc::EINVAL)) => Ok(None),
++                Err(e) => Err(e).with_context(|| format!("reading {attr} from {}", path.display())),
++            }
++        };
++        read
++    };
+ 
+     // An empty buffer returns the attribute's size.
+     let Some(len) = read(&mut [])? else { return Ok(None) };
