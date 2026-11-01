@@ -1,0 +1,40 @@
+--- a/src/commands/format_util.rs
++++ b/src/commands/format_util.rs
+@@ -467,11 +467,33 @@
+ }
+ 
+ fn total_system_ram() -> u64 {
+-    let mut info: libc::sysinfo = unsafe { std::mem::zeroed() };
+-    if unsafe { libc::sysinfo(&mut info) } != 0 {
+-        die("sysinfo() failed");
++    #[cfg(target_os = "linux")]
++    {
++        let mut info: libc::sysinfo = unsafe { std::mem::zeroed() };
++        if unsafe { libc::sysinfo(&mut info) } != 0 {
++            die("sysinfo() failed");
++        }
++        info.totalram as u64 * info.mem_unit as u64
+     }
+-    info.totalram as u64 * info.mem_unit as u64
++    // FreeBSD: sysctl hw.physmem — the same "physical RAM installed" figure
++    // sysinfo(2) reports on Linux.
++    #[cfg(target_os = "freebsd")]
++    {
++        let mut physmem: u64 = 0;
++        let mut len = std::mem::size_of::<u64>();
++        if unsafe {
++            libc::sysctlbyname(
++                c"hw.physmem".as_ptr(),
++                &mut physmem as *mut u64 as *mut libc::c_void,
++                &mut len,
++                std::ptr::null_mut(),
++                0,
++            )
++        } != 0 {
++            die("sysctl hw.physmem failed");
++        }
++        physmem
++    }
+ }
+ 
+ fn rounddown_pow_of_two(v: u64) -> u64 {
