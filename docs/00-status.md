@@ -7,7 +7,7 @@
 | Гейт | Условие | Статус
 |---|---|---|
 | G0 | `tools/bcachefs version` на FreeBSD | ✅ **v1.39.7-1539-gd48ba1a7a1d0-dirty** (Run 24, 131MB binary, 16:20)
-| G1 | format→fsck→fill→verify на тест-образе | 🏃 runtime-debug: EFAULT в preadv (page-шим) + «stat error» (bdev.rs:200 | tools-util.c:111)
+| G1 | format→fsck→fill→verify | 🏃 IO-путь починен (041 PAGE_MASK-инверсия, 042 bdev-fstat: format читает суперблоки!); блокер: ENOMEM_fs_btree_cache_init — синтезирован кодом (ядро ENOMEM не возвращает), runtime-debug-v2 инструментирует cache_init
 | G2 | FUSE rw тест-ФС + pjdfstest | ожидает G1
 | G3 | метаданные лучше 12.8 мс/файл моста | ожидает G2
 
