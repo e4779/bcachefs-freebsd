@@ -6,8 +6,8 @@
 
 | Гейт | Условие | Статус
 |---|---|---|
-| G0 | `tools/bcachefs version` на FreeBSD | ⏳ Run 20: 93→23 ошибок; fix-round3 закрывает остаток
-| G1 | format→fsck→fill→verify на тест-образе | ожидает G0
+| G0 | `tools/bcachefs version` на FreeBSD | ✅ **v1.39.7-1539-gd48ba1a7a1d0-dirty** (Run 24, 131MB binary, 16:20)
+| G1 | format→fsck→fill→verify на тест-образе | 🏃 runtime-debug: EFAULT в preadv (page-шим) + «stat error» (bdev.rs:200 | tools-util.c:111)
 | G2 | FUSE rw тест-ФС + pjdfstest | ожидает G1
 | G3 | метаданные лучше 12.8 мс/файл моста | ожидает G2
 
@@ -18,7 +18,7 @@
 | T01 клон | ✅ | orchestrator | d48ba1a, notes/01a
 | T02 аудит deps | ✅ | orchestrator | notes/02a (8/10 было)
 | T03 pkg | ✅ | orchestrator (+owner) | 6 пакетов, notes/00a
-| T04 сборка C | ✅ все объекты + 6 шимов (patch-bio f542fde + patch-shims 7d21efc + errno-промоушен + ETIME-реставрация) | 3 агента + orchestrator | notes/04a, patches 001-009
+| T04+T05 сборка | ✅ **G0**: полный бинарь собран (40 патчей; финальные: 038 unsafe-wrap, 039 build-link libs, 040 stdout→__stdoutp) | 5 агентов + orchestrator | notes/04a, 05a
 | T05/T09 Rust+fuse | ✅ merge fecf4e8 (rust-compat, патчи 020-029, bsd_compat 193 LOC) + ab16702 (fuser-porter, 010-012, fuseblk BSD-ветка); Run 20 собирает всё | 2 агента | notes/05a, 09a
 | T06 образ | скрипт готов (scripts/mk-test-fs.sh) | — | —
 | T07 fsck | скрипт готов (clean/fill режимы) | — | —
