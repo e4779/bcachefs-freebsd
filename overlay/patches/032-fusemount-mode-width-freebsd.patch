@@ -1,0 +1,23 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -190,6 +190,9 @@
+ }
+ 
+ fn mode_to_filetype(mode: u32) -> FileType {
++    // FreeBSD rustix RawMode is u16 (mode_t); the file-type bits fit either.
++    #[cfg(target_os = "freebsd")]
++    let mode = mode as u16;
+     match rustix::fs::FileType::from_raw_mode(mode) {
+         rustix::fs::FileType::RegularFile     => FileType::RegularFile,
+         rustix::fs::FileType::Directory       => FileType::Directory,
+@@ -607,7 +610,9 @@
+     /// atime_needs_update() and relatime_need_update(): with relatime, only
+     /// when atime isn't already after the last change, or is a day old.
+     fn needs_update(&self, fs: &Fs, bi: &c::bch_inode_unpacked, now: u64) -> bool {
+-        let is_dir = bi.bi_mode as u32 & libc::S_IFMT == libc::S_IFDIR;
++        // FreeBSD libc's S_IFMT/S_IFDIR are u16 (mode_t width); widen them
++        // to the u32 the inode mode is read as (no-op casts on Linux).
++        let is_dir = bi.bi_mode as u32 & libc::S_IFMT as u32 == libc::S_IFDIR as u32;
+         if is_dir && self.nodiratime {
+             return false;
+         }
