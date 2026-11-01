@@ -124,3 +124,12 @@ not a re-encoding.
 6. **fs_context placeholders** — if any caller skips FsContext::open() and
    calls move_mount/fsmount directly, syscall(-1) → ENOSYS errors surface;
    mount.rs goes through open() (checked), fusemount.rs is fuser-porter's.
+
+## T10: первый FUSE-маунт — детективная цепочка (17:36-17:50)
+
+1. kldload fusefs: ABI 7.35. Маунт падает EEXIST (os error 17), причём БЕЗ единого mount(2) в truss.
+2. Truss: /dev/fuse открыт (fd 12) → fork 35400 → fork 35401 → exec /sbin/mount_fusefs (после 4 ENOENT по PATH) → **write(2, "-o dev: option not supported")** → _exit(1). Внуки-хелперы умерли, libfuse3 замапил провал в EEXIST-обёртку.
+3. Корень: fusemount.rs:1884 пушит MountOption::Dev (Linux-семантика «разрешить dev-узлы»; fuser → libfuse3 → mount_fusefs(8), который опции dev не знает).
+4. Патч 044: cfg(not(freebsd)) на if-блоке. Пересборка Run 27.
+
+Урок диагностики: «EEXIST без syscall» = фейл в userspace-цепочке helper’ов; truss -f + grep по pid-дереву (fork→exec→write(2)) приводит к источнику за минуты.
