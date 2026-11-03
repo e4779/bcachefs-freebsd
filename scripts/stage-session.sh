@@ -3,6 +3,9 @@
 # Flow: fresh mdconfig + rw FUSE mount → run command (or interactive marker) →
 #       daemon RSS sampled every 10s → canary watcher → umount → fsck → verdict.
 # usage: scripts/stage-session.sh <image> <stage-dir> [command...]
+#   <image> is a regular file (mdconfig vnode bridge) OR a raw device node such
+#   as the staging zvol /dev/zvol/zdata/stage-pool (mounted directly, no md layer;
+#   <session>/dev then holds the full device path).
 #   command '-' (or none) → interactive marker mode: wrapper prints the marker file
 #   and waits until <session-dir>/done appears (write "fail" into it to flag failure).
 # env knobs:
@@ -24,7 +27,12 @@ CANARY=$ROOT/scripts/stage-canary.sh
 RLIMIT=$ROOT/scripts/rlimit-run.sh
 IMAGE=${1:?usage: stage-session.sh <image> <stage-dir> [command...]}; shift
 MNT=${1:?stage-dir = mountpoint}; shift
-[ -f "$IMAGE" ] || { echo "stage-session: no image $IMAGE" >&2; exit 1; }
+# normalize to absolute paths: every mount-table grep below matches the kernel's
+# absolutized entries — a relative arg would silently skip umount/detach and leak
+# a live daemon (measured 2026-11-04)
+case "$IMAGE" in /*) ;; *) IMAGE="$PWD/$IMAGE" ;; esac
+case "$MNT" in /*) ;; *) MNT="$PWD/$MNT" ;; esac
+[ -f "$IMAGE" ] || [ -c "$IMAGE" ] || { echo "stage-session: no image $IMAGE (regular file or device)" >&2; exit 1; }
 [ -x "$BIN" ]  || { echo "stage-session: no binary $BIN" >&2; exit 1; }
 [ -x "$CANARY" ] || { echo "stage-session: no $CANARY" >&2; exit 1; }
 
@@ -55,30 +63,37 @@ mounted_bcachefs() { mount | grep " on $MNT (" | grep -q bcachefs; }
 # md release with retry: the daemon may hold the device open for a few seconds after umount
 detach_md() {
   [ -n "$dev" ] || return 0
-  i=0
-  while [ $i -lt 10 ]; do
-    doas mdconfig -d -u "${dev#md}" 2>/dev/null && { dev=""; return 0; }
-    sleep 1; i=$((i+1))
-  done
-  echo "stage-session: WARNING md unit $dev still attached (device busy?)" >&2
-  return 1
+  case "$dev" in
+    md*) i=0
+         while [ $i -lt 10 ]; do
+           doas mdconfig -d -u "${dev#md}" 2>/dev/null && { dev=""; return 0; }
+           sleep 1; i=$((i+1))
+         done
+         echo "stage-session: WARNING md unit $dev still attached (device busy?)" >&2
+         return 1 ;;
+    *)  dev=""; return 0 ;;   # raw device (zvol): nothing to detach
+  esac
 }
 trap cleanup EXIT
 trap 'cleanup; exit 130' INT TERM
 
 echo "=== stage-session $TS"
 echo "image=$IMAGE mnt=$MNT session=$SESS"
-dev=$(doas mdconfig -t vnode -f "$IMAGE") || { echo "MOUNT-FAILED: mdconfig"; exit 1; }
+case "$IMAGE" in
+  /dev/*) dev=$IMAGE ;;   # raw device (zvol): use it as-is
+  *)      dev=$(doas mdconfig -t vnode -f "$IMAGE") || { echo "MOUNT-FAILED: mdconfig"; exit 1; } ;;
+esac
 echo "$dev" > "$SESS/dev"
+case "$dev" in /*) DEVSRC=$dev ;; *) DEVSRC=/dev/$dev ;; esac
 DAEMON_ENV="BCACHEFS_FUSE_LOG=$SESS/daemon.log"
 [ -n "${STAGE_LOG_LEVEL:-}" ] && DAEMON_ENV="$DAEMON_ENV BCACHEFS_LOG=$STAGE_LOG_LEVEL"
 MOUNTOPTS="fuse,allow_other"   # allow_other + default_permissions: the port's own
                                 # everyone-can-access philosophy; perms stay kernel-enforced
 if [ "$CAP" != "0" ]; then
-  doas env $DAEMON_ENV "$RLIMIT" "$CAP" "$BIN" mount -o "$MOUNTOPTS" "/dev/$dev" "$MNT" \
+  doas env $DAEMON_ENV "$RLIMIT" "$CAP" "$BIN" mount -o "$MOUNTOPTS" "$DEVSRC" "$MNT" \
     > "$SESS/mount.log" 2>&1 || true
 else
-  doas env $DAEMON_ENV "$BIN" mount -o "$MOUNTOPTS" "/dev/$dev" "$MNT" \
+  doas env $DAEMON_ENV "$BIN" mount -o "$MOUNTOPTS" "$DEVSRC" "$MNT" \
     > "$SESS/mount.log" 2>&1 || true
 fi
 i=0; up=0
@@ -90,7 +105,7 @@ if [ "$up" != "1" ]; then
   echo "MOUNT-FAILED (no fusefs at $MNT after ${i}s; see $SESS/mount.log)"
   exit 1
 fi
-echo "mount: /dev/$dev on $MNT (rw, $MOUNTOPTS, cap=${CAP}MB)"
+echo "mount: $DEVSRC on $MNT (rw, $MOUNTOPTS, cap=${CAP}MB)"
 # user-writable workspace inside the root-owned fs (fs perms enforced by default_permissions)
 doas mkdir -p "$MNT/.stage"
 doas chown "$(id -u):$(id -g)" "$MNT/.stage"
@@ -153,7 +168,12 @@ if mount | grep -q "on $MNT ("; then doas umount -f "$MNT" 2>/dev/null || true; 
 
 echo '--- md release + fsck -n (check-only on image, rctl cap 1024 MB)'
 detach_md
-"$RLIMIT" 1024 "$BIN" fsck -n "$IMAGE" > "$SESS/fsck.log" 2>&1
+if [ -c "$IMAGE" ]; then
+  # device images (zvols) are root:operator — the invoking user cannot open them
+  "$RLIMIT" 1024 doas "$BIN" fsck -n "$IMAGE" > "$SESS/fsck.log" 2>&1
+else
+  "$RLIMIT" 1024 "$BIN" fsck -n "$IMAGE" > "$SESS/fsck.log" 2>&1
+fi
 fsck_rc=$?
 tail -2 "$SESS/fsck.log"
 
