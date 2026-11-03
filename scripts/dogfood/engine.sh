@@ -42,6 +42,7 @@ if [ "${1:-}" = _inner ]; then
     CR=40; CB=100; CMAX=300;  DBN=8; DBT=120;  FSXOPS=200000; FSXFLEN=268435456
   fi
   IODEPTH=${FIO_IODEPTH:-4}
+export CORPUS_SIZE=$CSIZE
 
   log() { echo "$(date -u +%H:%M:%SZ) $*" >> "$ELOG"; echo "engine: $*" >&2; }
   fail() { log "FAIL: $*"; log "ENGINE RESULT: FAIL ($*)"; exit 1; }
