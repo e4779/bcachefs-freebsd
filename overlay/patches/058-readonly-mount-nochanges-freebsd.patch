@@ -1,6 +1,6 @@
 --- a/fs/sb/io.rs
 +++ b/fs/sb/io.rs
-@@ -1386,10 +1386,9 @@
+@@ -1386,7 +1386,7 @@
      // narrows exactly the ro mount. The EACCES reopen below and
      // rewrite_primary_super() key off BLK_OPEN_WRITE and are unaffected
      // for read-write opens.
@@ -8,24 +8,17 @@
 +    if !opts.nochanges_or_default() {
          sb.dev.mode |= c::BLK_OPEN_WRITE;
      }
--
      let open = |mode: c::blk_mode_t, holder: *mut c::bch_sb_handle_holder| {
-         // SAFETY: a C string, and our holder; the ops are static
-         let f = unsafe { c::bdev_file_open_by_path(path.as_ptr().cast(), mode, holder.cast(),
 --- a/src/commands/fusemount.rs
 +++ b/src/commands/fusemount.rs
-@@ -1961,9 +1961,11 @@
-     // read-only is both a fuser option (carried in parsed.fuse_options) and a
+@@ -1962,6 +1962,10 @@
      // filesystem-open concern - the latter isn't a mount flag, so set it here:
      if parsed.flags & ms::MS_RDONLY != 0 {
--        bch_opts.set_read_only(true);
--    }
--
-+		bch_opts.set_read_only(true);
+ 		bch_opts.set_read_only(true);
 +		// A read-only MOUNT never intends changes; nochanges keeps the
 +		// super-block fds O_RDONLY (see 057). fsck sets read_only WITHOUT
 +		// nochanges on purpose: it writes the clean bit on check-clean.
 +		bch_opts.set_nochanges(true);
+     }
      mount_options.extend(parsed.fuse_options);
  
-     // fuser defaults to nodev,nosuid, as fusermount does for an unprivileged
