@@ -14,7 +14,7 @@
 | G1 | format→fsck (fill→verify в T11) | ✅ полный offline fsck чисто |
 | T10 | FUSE ro-маунт | ✅ первый bcachefs-маунт на FreeBSD; umount+fsck чисты |
 | T11 core | rw семантика | ✅ write/hardlink(nlink=2)/rename-over/unlink + fsck clean |
-| G2 | pjdfstest полный | 🟡 убийца найден+пофиксен (045: chmod затирал S_IFDIR); **Run 28 пересборки прерван ребутом — перезапустить**; потом полный прогон на свежей ФС /tmp/bch-file.img (пере-format'ить) |
+| G2 | FUSE rw + pjdfstest | 🟢-почти: **365 passed / 25 failed / 125 skipped, fsck ЧИСТ после полного сьюта** (045 добил порчу). 25 = 10 chflags (FUSE-протокол, expected) + 15 errno-семейство (ENOTEMPTY/EINVAL — errno-round патчит). Новая платформа: 32GB, досборка 93с |
 | G3 | метаданные < 12.8 мс/файл | ждать G2; bench/ готов |
 
 ## Задачи
