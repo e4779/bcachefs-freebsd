@@ -1,0 +1,11 @@
+--- a/src/wrappers/bdev.rs
++++ b/src/wrappers/bdev.rs
+@@ -35,7 +35,7 @@
+     // works on any geom-backed fd; regular files fail it (ENOTTY) and
+     // fall through to fstat st_size.
+     let mut size: libc::off_t = 0;
+-    if unsafe { libc::ioctl(fd, libc::DIOCGMEDIASIZE, &mut size) } == 0 {
++    if unsafe { libc::ioctl(fd, 0x40086481 /* DIOCGMEDIASIZE = _IOR('d',129,off_t); absent from the Rust libc crate as of 0.2.189 */, &mut size) } == 0 {
+         return size as u64;
+     }
+     fd_metadata(fd).st_size as u64
