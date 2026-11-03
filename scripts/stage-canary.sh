@@ -8,8 +8,12 @@
 # usage: scripts/stage-canary.sh <mount> <session-log> [--auto-stop]
 #          [--threshold secs=10] [--timeout secs=12] [--interval secs=1]
 # exit: 0 mount-gone/terminated | 42 L1 auto-stop executed | 64 usage
-# Note: the probe pair shares ONE timeout envelope so the first alert lands at
-# ~timeout seconds even if both df and touch hang (alert budget = timeout + interval).
+# Note: the probe pair shares ONE timeout envelope, hard-killed at --timeout via
+# SIGKILL (SIGTERM would only stop the wrapper sh while df/touch stay stuck in the
+# kernel on a stalled daemon — measured 40-60s per probe, blurring L0/L1 timing).
+# KILLed probes leave orphan df/touch children stuck in the kernel until the daemon
+# resumes or the mount is force-unmounted — bounded, expected, they exit then.
+# Alert budget: first L0 lands at ~timeout+interval after the stall begins.
 set -u
 MNT=${1:?usage: stage-canary.sh <mount> <session-log> [options]}
 LOG=${2:?session-log path}
@@ -39,7 +43,7 @@ stalls=0; first=1
 while :; do
   if ! mounted; then log "CANARY EXIT mount-gone"; exit 0; fi
   t0=$(date +%s)
-  timeout "$KILLT" sh -c "df '$MNT' >/dev/null 2>&1 && touch '$PROBE'"
+  timeout -s KILL "$KILLT" sh -c "df '$MNT' >/dev/null 2>&1 && touch '$PROBE'"
   rc=$?
   t1=$(date +%s); dt=$((t1 - t0))
   if [ "$rc" -eq 124 ] || [ "$dt" -ge "$THRESH" ]; then
