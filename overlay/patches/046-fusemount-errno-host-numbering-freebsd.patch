@@ -1,0 +1,39 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -257,8 +257,7 @@
+ /// Convert a raw C return value (negative bcachefs error code) to a fuser Errno.
+ /// Walks the bcachefs error hierarchy to the root standard errno.
+ fn err(ret: i32) -> Errno {
+-    let e = BchError::from_raw(if ret < 0 { -ret } else { ret });
+-    Errno::from_i32(e.errno())
++    bch_err(&BchError::from_raw(if ret < 0 { -ret } else { ret }))
+ }
+ 
+ /// Convert a BchError to a fuser Errno.
+@@ -276,7 +275,25 @@
+ }
+ 
+ fn bch_err(e: &BchError) -> Errno {
+-    Errno::from_i32(e.errno())
++    // The errcode table roots every BCH_ERR_* in an errno numbered as
++    // linux-raw-sys numbers it (fs/errcode.rs's class module), while
++    // fuser's Errno is the raw host errno - and the two kernels disagree
++    // past errno 34: ENOTEMPTY is 39 on Linux but 66 on FreeBSD,
++    // EOPNOTSUPP 95 vs 45. A raw pass-through answered rmdir/rename of a
++    // non-empty directory with 39, EDESTADDRREQ here. Of the errnos the
++    // filesystem can emit, these two are the only roots that diverge -
++    // EEXIST, EINVAL, ENOSPC, ... all coincide - and plain errnos from
++    // the C build already carry host numbering. Match by chain root so
++    // the derived BCH_ERR_ENOTEMPTY_dir_not_empty translates too; the
++    // Errno constants are the host libc values (an identity mapping on
++    // Linux, so no cfg).
++    const LINUX_ENOTEMPTY: i32 = 39;
++    const LINUX_EOPNOTSUPP: i32 = 95;
++    match e.errno() {
++        LINUX_ENOTEMPTY  => Errno::ENOTEMPTY,
++        LINUX_EOPNOTSUPP => Errno::EOPNOTSUPP,
++        errno            => Errno::from_i32(errno),
++    }
+ }
+ 
+ /// @req supplies the owner: the caller's fsuid and fsgid, which is what the
