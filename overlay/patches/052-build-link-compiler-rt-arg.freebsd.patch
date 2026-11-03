@@ -1,0 +1,9 @@
+--- a/build-link.rs
++++ b/build-link.rs
+@@ -30,5 +30,5 @@
+     // FreeBSD: __cpu_model (cpu-feature intrinsics, e.g. raid/x86.c) lives in
+     // libgcc_s; clang-compiled objects reference it and the Rust link line
+     // does not pull libgcc on FreeBSD by default.
+-    println!("cargo:rustc-link-lib=static=compiler_rt");
++    println!("cargo:rustc-link-arg-bins=-lcompiler_rt");
+ }
