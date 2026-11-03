@@ -104,3 +104,6 @@ library + 16×64M; farm 500×1M×6 ссылок; db 64×64M), fio write 300 c + 
 Находки dry-прогона (2 бага двигателя, 0 багов ФС): posixaio EOPNOTSUPP (fusefs без POSIX AIO → psync), CORPUS_SIZE env-mismatch в chaos (ложный дрифт; ФС была чиста).
 
 Следующий шаг: непрерывный soak (mode=full) — по решению владельца утром.
+
+## Q4 ЗАВЕРШЕНО (2026-11-04 02:16)
+zdata/pool-irreplaceable: lib 153G (on-disk, sparse-aware) + seeds-mule 32.1G + снапшот q4-initial. Незаменимое под двойной защитой (ada0, отдельный физический диск от обоих членов пула).
