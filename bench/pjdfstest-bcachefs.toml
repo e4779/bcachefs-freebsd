@@ -1,0 +1,35 @@
+# pjdfstest configuration for the bcachefs FUSE mount (bcachefs-freebsd).
+#
+# Usage (the mount is root-owned; the runner needs doas):
+#   doas pjdfstest -c bench/pjdfstest-bcachefs.toml -p /tmp/bch-mnt
+#
+# Baseline (G2, full run, /tmp/pjdf-final.log): 365 passed / 25 failed /
+# 125 skipped / 515 total, fsck clean after. Patches 046+047 fix the 15
+# errno-family failures (rmdir/rename of a non-empty directory, rename
+# into own subtree). The 10 listed below are the FUSE protocol's own
+# limit: there is no chflags request in the protocol, so the kernel can
+# neither enforce file flags nor report them, and ctime around chflags
+# is unverifiable - expected failures, not bugs.
+
+# [features] is deliberately absent: file_flags stays out (no chflags
+# path through FUSE - see above); nfsv4_acls and posix_fallocate stay
+# off, matching the baseline run. dummy_auth is omitted as in the
+# baseline (nobody/tests exist if the chown family needs unskipping
+# later - expect new failures first).
+
+[settings]
+# naptime: suite default (bcachefs keeps nanosecond timestamps).
+allow_remount = false
+
+expected_failures = [
+    "chflags::unchanged_ctime_failed::socket",
+    "chflags::unchanged_ctime_failed::fifo",
+    "chflags::unchanged_ctime_failed::dir",
+    "chflags::unchanged_ctime_failed::regular",
+    "chflags::changed_ctime_success::socket",
+    "chflags::changed_ctime_success::char",
+    "chflags::changed_ctime_success::block",
+    "chflags::changed_ctime_success::fifo",
+    "chflags::changed_ctime_success::dir",
+    "chflags::changed_ctime_success::regular",
+]
