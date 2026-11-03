@@ -14,10 +14,11 @@ set -u
 MNT=${1:?usage: stage-canary.sh <mount> <session-log> [options]}
 LOG=${2:?session-log path}
 shift 2
-AUTO=0; THRESH=10; KILLT=12; INTERVAL=1
+AUTO=0; THRESH=10; KILLT=12; INTERVAL=1; PDIR=""
 while [ $# -gt 0 ]; do
   case $1 in
     --auto-stop) AUTO=1 ;;
+    --probe-dir) PDIR=${2:?}; shift ;;
     --threshold) THRESH=${2:?}; shift ;;
     --timeout)   KILLT=${2:?}; shift ;;
     --interval)  INTERVAL=${2:?}; shift ;;
@@ -32,7 +33,7 @@ log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*" >> "$LOG"; }
 mounted() { mount | grep -q "on $MNT ("; }
 trap 'log "CANARY EXIT terminated"; exit 0' TERM INT
 
-PROBE="$MNT/.canary.$$"
+PROBE="${PDIR:-$MNT}/.canary.$$"
 log "CANARY START mount=$MNT threshold=${THRESH}s timeout=${KILLT}s auto-stop=$AUTO pid=$$"
 stalls=0; first=1
 while :; do

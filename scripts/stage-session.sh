@@ -12,6 +12,11 @@
 # The image must be bcachefs-formatted already (mk-test-fs.sh / regression.sh format).
 # Session dir: tmp/stage-sessions/<ts>/ {session.env,dev,mount.log,daemon.log,command.log,
 #   rss.log,canary.log,fsck.log,verdict}. Exit: 0 clean | 1 mount fail | 2 fsck dirty | 3 command fail.
+# Verdict fsck is CHECK-ONLY (fsck -n) on the backing image file: a journal-dirty image
+# counts as clean (journal replay belongs to the mount path — verified 2026-11-03);
+# nonzero = damage beyond journal replay. Repair-fsck (write path) is broken on the
+# current binary by patch 057 (read_only opens lost BLK_OPEN_WRITE → superblock EBADF);
+# see docs/notes/17a-frame-zero.md.
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BIN=$ROOT/tools/bcachefs
@@ -43,8 +48,20 @@ cleanup() {
   if mount | grep -q "on $MNT ("; then
     doas umount "$MNT" 2>/dev/null || doas umount -f "$MNT" 2>/dev/null || true
   fi
-  if [ -n "$dev" ]; then doas mdconfig -d -u "${dev#md}" 2>/dev/null; dev=""; fi
+  detach_md
   return 0
+}
+mounted_bcachefs() { mount | grep " on $MNT (" | grep -q bcachefs; }
+# md release with retry: the daemon may hold the device open for a few seconds after umount
+detach_md() {
+  [ -n "$dev" ] || return 0
+  i=0
+  while [ $i -lt 10 ]; do
+    doas mdconfig -d -u "${dev#md}" 2>/dev/null && { dev=""; return 0; }
+    sleep 1; i=$((i+1))
+  done
+  echo "stage-session: WARNING md unit $dev still attached (device busy?)" >&2
+  return 1
 }
 trap cleanup EXIT
 trap 'cleanup; exit 130' INT TERM
@@ -55,23 +72,28 @@ dev=$(doas mdconfig -t vnode -f "$IMAGE") || { echo "MOUNT-FAILED: mdconfig"; ex
 echo "$dev" > "$SESS/dev"
 DAEMON_ENV="BCACHEFS_FUSE_LOG=$SESS/daemon.log"
 [ -n "${STAGE_LOG_LEVEL:-}" ] && DAEMON_ENV="$DAEMON_ENV BCACHEFS_LOG=$STAGE_LOG_LEVEL"
+MOUNTOPTS="fuse,allow_other"   # allow_other + default_permissions: the port's own
+                                # everyone-can-access philosophy; perms stay kernel-enforced
 if [ "$CAP" != "0" ]; then
-  doas env $DAEMON_ENV "$RLIMIT" "$CAP" "$BIN" mount -o fuse "/dev/$dev" "$MNT" \
+  doas env $DAEMON_ENV "$RLIMIT" "$CAP" "$BIN" mount -o "$MOUNTOPTS" "/dev/$dev" "$MNT" \
     > "$SESS/mount.log" 2>&1 || true
 else
-  doas env $DAEMON_ENV "$BIN" mount -o fuse "/dev/$dev" "$MNT" \
+  doas env $DAEMON_ENV "$BIN" mount -o "$MOUNTOPTS" "/dev/$dev" "$MNT" \
     > "$SESS/mount.log" 2>&1 || true
 fi
 i=0; up=0
 while [ $i -lt 30 ]; do
-  if mount | grep -q "on $MNT (.*type fusefs"; then up=1; break; fi
+  if mounted_bcachefs; then up=1; break; fi
   sleep 1; i=$((i+1))
 done
 if [ "$up" != "1" ]; then
   echo "MOUNT-FAILED (no fusefs at $MNT after ${i}s; see $SESS/mount.log)"
   exit 1
 fi
-echo "mount: /dev/$dev on $MNT (rw, cap=${CAP}MB)"
+echo "mount: /dev/$dev on $MNT (rw, $MOUNTOPTS, cap=${CAP}MB)"
+# user-writable workspace inside the root-owned fs (fs perms enforced by default_permissions)
+doas mkdir -p "$MNT/.stage"
+doas chown "$(id -u):$(id -g)" "$MNT/.stage"
 
 # RSS sampler: daemon matched by (bcachefs mount + this mountpoint + ppid 1), 10s cadence
 (
@@ -83,12 +105,13 @@ echo "mount: /dev/$dev on $MNT (rw, cap=${CAP}MB)"
 ) >> "$SESS/rss.log" 2>&1 &
 rss_pid=$!
 
-# canary watcher (L0)
+# canary watcher (L0); probes write inside .stage so they exercise the FUSE write path as this user
 # shellcheck disable=SC2086
-"$CANARY" "$MNT" "$SESS/canary.log" ${STAGE_CANARY_OPTS:-} &
+"$CANARY" "$MNT" "$SESS/canary.log" --probe-dir "$MNT/.stage" ${STAGE_CANARY_OPTS:-} &
 canary_pid=$!
 
 export STAGE_MNT="$MNT"
+export STAGE_WORK="$MNT/.stage"
 rc=0
 if [ $# -eq 0 ] || [ "$1" = "-" ]; then
   cat > "$SESS/interactive.marker" <<EOF
@@ -128,8 +151,9 @@ i=0; while [ $i -lt 15 ]; do
 done
 if mount | grep -q "on $MNT ("; then doas umount -f "$MNT" 2>/dev/null || true; fi
 
-echo '--- fsck (rctl cap 1024 MB)'
-"$RLIMIT" 1024 "$BIN" fsck "/dev/$dev" > "$SESS/fsck.log" 2>&1
+echo '--- md release + fsck -n (check-only on image, rctl cap 1024 MB)'
+detach_md
+"$RLIMIT" 1024 "$BIN" fsck -n "$IMAGE" > "$SESS/fsck.log" 2>&1
 fsck_rc=$?
 tail -2 "$SESS/fsck.log"
 
