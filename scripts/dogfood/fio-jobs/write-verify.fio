@@ -1,0 +1,29 @@
+# write-verify.fio — raw write phase with inline content verification.
+# FUSE-stack caveats baked in (docs/notes/18a §2):
+#   * buffered-only (direct=0): the daemon does not negotiate FOPEN_DIRECT_IO;
+#     writeback cache (FUSE_WRITEBACK_CACHE) already gives the honest kernel path
+#   * iodepth ≤ 16: fuser sets max_background=16 — deeper queues just wait in the
+#     kernel; the engine may sweep 1/4/8/16 via __IODEPTH__
+#   * fdatasync=1: buffered-write errors only surface on flush (fio man warns)
+# Placeholders (engine substitutes): __DIR__ __RUNTIME__ __IODEPTH__ __NRFILES__ __FILESIZE__
+[write-verify]
+name=write-verify
+ioengine=posixaio
+buffered=1
+direct=0
+iodepth=__IODEPTH__
+directory=__DIR__
+filename_format=dog$filenum
+nrfiles=__NRFILES__
+filesize=__FILESIZE__
+file_service_type=random
+unlink=0
+rw=randwrite
+bs=1m
+verify=sha512
+verify_fatal=1
+verify_backlog=1024
+fdatasync=1
+time_based=1
+runtime=__RUNTIME__
+group_reporting=1

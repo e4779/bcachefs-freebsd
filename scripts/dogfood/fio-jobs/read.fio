@@ -1,0 +1,20 @@
+# read.fio — read-heavy phase: randread over the SAME file set the write-verify
+# phase created (identical directory + filename_format + nrfiles/filesize).
+# Placeholders (engine substitutes): __DIR__ __RUNTIME__ __IODEPTH__ __NRFILES__ __FILESIZE__
+[randread]
+name=randread
+ioengine=posixaio
+buffered=1
+direct=0
+iodepth=__IODEPTH__
+directory=__DIR__
+filename_format=dog$filenum
+nrfiles=__NRFILES__
+filesize=__FILESIZE__
+file_service_type=random
+unlink=0
+rw=randread
+bs=1m
+time_based=1
+runtime=__RUNTIME__
+group_reporting=1

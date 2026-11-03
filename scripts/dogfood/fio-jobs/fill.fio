@@ -1,0 +1,19 @@
+# fill.fio — ENOSPC preparator for chaos drill (c): sequential write until the
+# filesystem is full (fill_fs=1: fio grows files until ENOSPC/EDQUOT ends the job).
+# Files land in their own directory so the drill can free them selectively.
+# Placeholders (engine substitutes): __DIR__
+[fill]
+name=fill
+ioengine=posixaio
+buffered=1
+direct=0
+iodepth=1
+directory=__DIR__
+filename_format=fill$filenum
+nrfiles=8
+filesize=64g
+rw=write
+bs=1m
+fill_fs=1
+fsync_on_close=1
+group_reporting=1
