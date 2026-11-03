@@ -1,0 +1,11 @@
+--- a/build-link.rs
++++ b/build-link.rs
+@@ -27,4 +27,8 @@
+         println!("cargo:rustc-link-lib=aio");
+     }
+     println!("cargo:rustc-link-lib=unwind");
++    // FreeBSD: __cpu_model (cpu-feature intrinsics, e.g. raid/x86.c) lives in
++    // libgcc_s; clang-compiled objects reference it and the Rust link line
++    // does not pull libgcc on FreeBSD by default.
++    println!("cargo:rustc-link-lib=dylib=gcc_s");
+ }
