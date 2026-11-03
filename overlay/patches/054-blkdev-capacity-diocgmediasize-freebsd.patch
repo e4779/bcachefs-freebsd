@@ -1,0 +1,33 @@
+--- a/linux/blkdev.c
++++ b/linux/blkdev.c
+@@ -22,6 +22,9 @@
+ 
+ #include <linux/bio.h>
+ #include <linux/blkdev.h>
++#ifdef __FreeBSD__
++#include <sys/disk.h>
++#endif
+ #include <linux/completion.h>
+ #include <linux/fs.h>
+ #include <linux/kthread.h>
+@@ -248,8 +251,19 @@
+ 	ret = fstat(bdev->bd_fd, &statbuf);
+ 	BUG_ON(ret);
+ 
+-	if (!S_ISBLK(statbuf.st_mode))
++	if (!S_ISBLK(statbuf.st_mode)) {
++#ifdef __FreeBSD__
++		/* FreeBSD geom providers (md, ada, nda, ...) are CHARACTER
++		 * devices: st_size is 0 there. DIOCGMEDIASIZE is the
++		 * canonical size ioctl for any geom-backed fd. */
++		if (S_ISCHR(statbuf.st_mode)) {
++			off_t mediasize;
++			if (!ioctl(bdev->bd_fd, DIOCGMEDIASIZE, &mediasize))
++				return ((u64)mediasize) >> 9;
++		}
++#endif
+ 		return statbuf.st_size >> 9;
++	}
+ 
+ 	ret = ioctl(bdev->bd_fd, BLKGETSIZE64, &bytes);
+ 	BUG_ON(ret);
