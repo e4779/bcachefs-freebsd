@@ -190,3 +190,24 @@ failures / 125 skipped / 0 failed, fsck clean.
 2. Baseline протокола брать ПОСЛЕ shutdown VM (наш pre-shutdown baseline создал ложное DIFFERENT).
 3. Часы гостя убегают вперёд ~6ч20м (Nov 4 03:44 при хостовом Nov 3 21:25) — заметка владельцу.
 4. fusefs-модуль не переживает ребут — добавить kldload в протокол шагом 0.
+
+## fd 10 — root cause и фикс (2026-11-04, патч 057)
+
+**Механизм (по /var/log/window-truss.log, pid 8662, mount-кластер):**
+
+| fd | flags | кто | судьба |
+|---|---|---|---|
+| 6, 7 | O_RDONLY\|O_DIRECT | scan_sbs → read_super_silent (nochanges) | живут в демоне |
+| 4, 5 | O_RDONLY\|O_CLOEXEC | lock_devices | до destroy |
+| **10, 11** | **O_RDWR\|O_EXCL\|O_DIRECT** | **bch2_read_super ← bch2_fs_open ← Fs::open (fusemount)** | **весь маунт** |
+
+Это НЕ ленивый open — он в mount-кластере truss (строки 1308/1317), procstat просто вскрыл его позже. `read_super_and_backups` (fs/sb/io.rs) добавляет `BLK_OPEN_WRITE` всем вызывающим без `nochanges`; маунт `-o fuse,ro` ставит `read_only=1`, но НЕ `nochanges` → персистентные sb-fd демона на ОБОИХ членах пула — rw на всё время маунта. O_EXCL в флагах подтверждает путь: geom-провайдеры на FreeBSD — S_IFCHR, fusemount не распознал блочность → ветка Fuse (не Fuseblk с noexcl) → mode = READ|WRITE|EXCL.
+
+**Почему апстрим так делает:** rw-open при чтении суперблоков позволяет recovery и `rewrite_primary_super` чинить суперблок даже под `-o ro`; на Linux ro-гейт ядра под маунтом держит защиту. В порту fd сам и есть write-capability — структурная дыра в протоколе «ноль write-способности на живом пуле». Побочное подтверждение: dirty-ro фаза 2 — демон «requested read-write, got EROFS» — это ровно этот fd, открывшийся rw на ro-backend и честно упёршийся в backend, а не в нас.
+
+**Фикс (057):** fs/sb/io.rs — `if !opts.nochanges_or_default() && !opts.read_only_or_default() { mode |= BLK_OPEN_WRITE }` + инвариант комментарием. Аудит всех вызывающих read_super: единственная комбинация read_only=1 && nochanges=0 — это ro-маунт (mount/fusemount/degraded; все остальные read_only-вызовы — fsck/list/dump/super/journal_rewind/kill_btree/kvdb/migrate — ставят nochanges тоже). Поведение меняется только у ro-маунта: открытие O_RDONLY|O_EXCL|O_DIRECT; `rewrite_primary_super` под ro больше не сработает (и не должен — визит требует bit-exact); EACCES-fallback остаётся для rw.
+
+**Попутно починено:** overlay/apply.sh — `mkdir -p "$(dirname "$$dest")"` раскрывал `$$` в PID; копирование files/ работало только потому, что целевые каталоги уже существовали в клоне. На свежем клоне (worktree-верификация 057) cp падал. `$$dest` → `$dest`.
+
+**Верификация 057 (без сборки):** свежий shared-clone tools @ d48ba1a в worktree, полный forward-цеп 001→057 (50 патчей = 50 штампов), hunk лёг на 1377. Поведенческая проверка ro-открытия — на следующей тестовой ФС (fsck-roundtrip), не на живом пуле.
+

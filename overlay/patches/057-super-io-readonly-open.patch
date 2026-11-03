@@ -1,0 +1,20 @@
+--- a/fs/sb/io.rs
++++ b/fs/sb/io.rs
+@@ -1377,7 +1377,16 @@
+     if !opts.noexcl_or_default() {
+         sb.dev.mode |= c::BLK_OPEN_EXCL;
+     }
+-    if !opts.nochanges_or_default() {
++    // Invariant: a read-only mount holds no write-capable device fd. In
++    // this port the open fd itself is the write capability - there is no
++    // kernel mount ro gate underneath us. Upstream asks for WRITE unless
++    // nochanges so recovery and the primary-superblock rewrite below can
++    // write even under -o ro; a ro mount sets read_only but not nochanges,
++    // and every other read_only caller sets nochanges as well, so this
++    // narrows exactly the ro mount. The EACCES reopen below and
++    // rewrite_primary_super() key off BLK_OPEN_WRITE and are unaffected
++    // for read-write opens.
++    if !opts.nochanges_or_default() && !opts.read_only_or_default() {
+         sb.dev.mode |= c::BLK_OPEN_WRITE;
+     }
+ 

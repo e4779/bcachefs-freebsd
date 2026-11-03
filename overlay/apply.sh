@@ -10,7 +10,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 # 1. files: copy overlay/files/** into tools/, overwriting (deterministic).
 ( cd "$root/overlay/files" && find . -type f | while read -r f; do
 	dest="$root/tools/$f"
-	mkdir -p "$(dirname "$$dest")"
+	mkdir -p "$(dirname "$dest")"
 	cp "$f" "$dest"
 done )
 
