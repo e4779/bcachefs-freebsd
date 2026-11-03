@@ -1,0 +1,27 @@
+--- a/linux/blkdev.c
++++ b/linux/blkdev.c
+@@ -22,9 +22,6 @@
+ 
+ #include <linux/bio.h>
+ #include <linux/blkdev.h>
+-#ifdef __FreeBSD__
+-#include <sys/disk.h>
+-#endif
+ #include <linux/completion.h>
+ #include <linux/fs.h>
+ #include <linux/kthread.h>
+@@ -257,8 +254,12 @@
+ 		 * devices: st_size is 0 there. DIOCGMEDIASIZE is the
+ 		 * canonical size ioctl for any geom-backed fd. */
+ 		if (S_ISCHR(statbuf.st_mode)) {
+-			off_t mediasize;
+-			if (!ioctl(bdev->bd_fd, DIOCGMEDIASIZE, &mediasize))
++			/* DIOCGMEDIASIZE = _IOR('d', 129, off_t); spelled out
++			 * numerically because <sys/disk.h> drags in sys/conf.h
++			 * whose 2-arg BSD LIST_HEAD collides with the 1-arg
++			 * linux/list.h shim in this TU. */
++			long mediasize;
++			if (!ioctl(bdev->bd_fd, 0x40086481UL, &mediasize))
+ 				return ((u64)mediasize) >> 9;
+ 		}
+ #endif
