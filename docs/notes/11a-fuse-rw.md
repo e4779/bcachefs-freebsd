@@ -1,7 +1,9 @@
 # 11a — pjdfstest on the FUSE mount: bisect + root cause (T11)
 
 Agent: bisect-fuse. Status: **root cause found, fix patched (045), awaiting
-orchestrator rebuild + rerun.**
+orchestrator rebuild + rerun.** T11-final (errno-round) below: 045 held,
+the 15 errno-family failures root-caused and patched (046/047), project
+pjdfstest config added — same gate: orchestrator rebuilds and reruns.
 
 ## Symptom
 
@@ -97,3 +99,65 @@ FUSE_FORGET was the kernel reacting to our type flip, not a lifetime bug.
   excellent but needs `--foreground` (hardcoded off) or ktrace(GENIO) to see.
   ktrace(GENIO) on the daemon pid is a zero-rebuild wire tap — remember to
   detach (`ktrace -c -p PID`); a left-on trace grew to 4.5 GB in ~10 min.
+
+## T11 final — the 25 failures of the G2 full run (errno-round)
+
+G2 full run (/tmp/pjdf-final.log): 365 passed / 25 failed / 125 skipped /
+515 total, fsck clean after. 10 of the 25 are `chflags::*` — inherent to
+the FUSE protocol (no chflags request exists, so flags are neither
+enforced nor reported and ctime around chflags is unverifiable). They are
+listed as expected failures in the project config
+**bench/pjdfstest-bcachefs.toml** (`doas pjdfstest -c bench/pjdfstest-bcachefs.toml
+-p /tmp/bch-mnt`; no file_flags feature — with it the chflags family fails
+even on ZFS). Note the runner's semantics: a test in expected_failures
+that *passes* is reported FAILED ("PASSED UNEXPECTEDLY") — the list is a
+contract, not a suppression.
+
+The other 15 were two real bugs, both in the daemon, both patched.
+
+### 046 — rmdir/rename of a non-empty directory answered EDESTADDRREQ
+
+7× `rmdir::eexist_enotempty_non_empty_dir::*` and 7×
+`rename::eexist_enotempty_to_non_empty::*` failed because the daemon
+replied errno 39: Linux's ENOTEMPTY. `bch_err()` passed `e.errno()` to
+fuser's `Errno::from_i32()` raw — but the errcode table roots every
+BCH_ERR_* in an errno numbered by linux-raw-sys (fs/errcode.rs's class
+module; `errno()` walks the chain to that root), while fuser's Errno is
+the raw *host* errno. The kernels disagree past errno 34: ENOTEMPTY is
+39 on Linux, 66 on FreeBSD — so the kernel read 39 = EDESTADDRREQ,
+which matches neither EEXIST nor ENOTEMPTY.
+
+The FS itself was already right: namei.rs `unlink_trans()`/`rename_trans()`
+call `dirent::empty_dir_trans()`, which returns
+BCH_ERR_ENOTEMPTY_dir_not_empty — only the numbering at the daemon
+boundary was wrong. Of the errnos the FS can emit, exactly two roots
+diverge (verified against fs/errcode_types.rs): ENOTEMPTY 39→66 and
+EOPNOTSUPP 95→45; everything else (EEXIST 17, EINVAL 22, ENOSPC 28,
+…) coincides, and plain errnos from the C build already carry host
+numbering. Patch 046 translates those two by chain root in `bch_err()`
+and routes `err()` (the C-return-value twin) through it. No cfg: on
+Linux the table is the identity. POSIX allows EEXIST or ENOTEMPTY here;
+we answer ENOTEMPTY. (The EEXIST at fusemount.rs:1342 is the
+Linux-only RENAME_NOREPLACE arm — unrelated.)
+
+### 047 — rename(dir, path-inside-it) returned Ok(())
+
+`rename::einval_parent_from_subdir_to` renamed d1 into d1/d2 and
+succeeded — the bi_depth wrapping in rename_trans() is the only guard,
+i.e. silent-corruption territory. The Linux VFS rejects the prefix case
+in may_move() before the FS is called; FreeBSD's fusefs(4) forwards the
+request, so the daemon must check. Patch 047 walks dst_dir's dirent
+backpointers (bi_dir/bi_dir_offset — a directory has exactly one name)
+up toward the root and answers EINVAL on meeting the renamed directory.
+This mirrors namei.rs's own `inum_to_path_up()`/`parent_inum()` walk
+(root / no-backpointer termination, subvol crossing via
+bi_parent_subvol). O(depth), capped at 512 (PATH_MAX/2 — deeper is a
+corrupt backpointer loop, which must not spin the daemon; past the cap
+rename_trans()'s own checks govern). EINVAL precedes the target checks,
+as may_move() orders it. Unlocked reads are safe: the daemon is
+single-threaded on FreeBSD (patch 011).
+
+Both patches are uncfg'd generic POSIX semantics. NOT re-run: the
+orchestrator rebuilds (045+046+047), re-formats /tmp/bch-file.img,
+reruns with the project config. Expectation: 380 passed / 10 expected
+failures / 125 skipped / 0 failed, fsck clean.
