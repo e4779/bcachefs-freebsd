@@ -161,3 +161,6 @@ Both patches are uncfg'd generic POSIX semantics. NOT re-run: the
 orchestrator rebuilds (045+046+047), re-formats /tmp/bch-file.img,
 reruns with the project config. Expectation: 380 passed / 10 expected
 failures / 125 skipped / 0 failed, fsck clean.
+
+## Dirty-ro эксперимент — PASS (детали)
+
