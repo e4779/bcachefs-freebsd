@@ -1,8 +1,9 @@
 #!/bin/sh
 # stage-sentinel.sh — Ф0 stop-layer L2: stratified sha256 sentinel set over a mounted fs.
 # build  : sample 64 files stratified by find depth — 8 top / 24 mid / 32 deep —
-#          deterministic: files sorted by (depth, path), strata cut by rank thirds,
-#          even stride inside each stratum (clamped to availability).
+#          deterministic: files sorted by (depth, path); the DISTINCT depth values
+#          are cut into thirds (top/mid/deep depth classes — robust under lopsided
+#          histograms); even stride inside each stratum (clamped to availability).
 # verify : re-hash every recorded file; drift = MISSING or CHANGED content.
 #          New files are NOT drift (the sentinel is a fixed sample).
 # usage: scripts/stage-sentinel.sh build  <mount> <sentinels-file>
@@ -17,22 +18,27 @@ TAB=$(printf '\t')
 case $MODE in
 build)
   TMP=$(mktemp -d) || exit 1
-  # depth = number of path components of the relpath (root file = 1)
-  find "$MNT" -type f | sed "s|^$MNT/||" | awk -F/ '{print NF $TAB $0}' \
+  # depth = number of path components of the relpath (root file = 1); stderr silenced
+  # (root-owned lost+found is unreadable for the invoking user — harmless for sampling)
+  find "$MNT" -type f 2>/dev/null | sed "s|^$MNT/||" | awk -F/ '{print NF "\t" $0}' \
     | LC_ALL=C sort -k1,1n -k2,2 > "$TMP/index"
   total=$(wc -l < "$TMP/index" | tr -d ' ')
   [ "$total" -ge 1 ] || { echo "stage-sentinel: no files under $MNT" >&2; rm -rf "$TMP"; exit 1; }
   awk -F'\t' -v TAB="$TAB" '
-    { d[NR] = $1; p[NR] = $2 }
+    { d[NR] = $1; p[NR] = $2; if (NR == 1 || d[NR] != d[NR-1]) u[++nu] = d[NR] }
     END {
-      t1 = int(NR / 3); t2 = int(2 * NR / 3)
       split("8 24 32", q, " ")
+      for (r = 1; r <= NR; r++) {
+        k = 1; while (u[k] != d[r]) k++          # index of this depth among distinct
+        s = (k <= int(nu / 3)) ? 1 : (k <= int(2 * nu / 3)) ? 2 : 3
+        cnt[s]++
+      }
+      off[1] = 0
       for (s = 1; s <= 3; s++) {
-        n    = (s == 1 ? t1 : (s == 2 ? t2 - t1 : NR - t2))
-        base = (s == 1 ? 1    : (s == 2 ? t1 + 1     : t2 + 1))
+        n = cnt[s]; off[s + 1] = off[s] + n      # ALWAYS advance, even for empty strata
         if (n < 1) continue
         for (k = 0; k < q[s] && k < n; k++)
-          sel[++m] = base + (q[s] <= 1 || n <= 1 ? 0 : int(k * (n - 1) / (q[s] - 1)))
+          sel[++m] = off[s] + 1 + (q[s] <= 1 || n <= 1 ? 0 : int(k * (n - 1) / (q[s] - 1)))
       }
       for (i = 1; i <= m; i++) print d[sel[i]] TAB p[sel[i]]
     }' "$TMP/index" > "$TMP/selected"
@@ -44,8 +50,9 @@ build)
     printf '%s%s%s%s%s\n' "$h" "$TAB" "$depth" "$TAB" "$rel" >> "$OUT"
   done < "$TMP/selected"
   n_out=$(wc -l < "$OUT" | tr -d ' ')
-  dmin=$(awk -F'\t' 'NR==1{print $1}' "$OUT"); dmax=$(awk -F'\t' 'END{print $1}' "$OUT")
-  echo "sentinels: $n_out/$total files (quota 8/24/32 by depth-rank thirds; depth $dmin..$dmax) -> $OUT"
+  dmin=$(awk -F'\t' 'NR==1{print $1}' "$TMP/selected")
+  dmax=$(awk -F'\t' 'END{print $1}' "$TMP/selected")
+  echo "sentinels: $n_out/$total files (quota 8/24/32 over top/mid/deep depth classes; depth $dmin..$dmax) -> $OUT"
   rm -rf "$TMP"
   [ "$n_out" -ge 1 ] || exit 1
   ;;
@@ -61,7 +68,9 @@ verify)
     if [ "$h" != "$h2" ]; then echo "CHANGED d=$depth $rel ($h -> $h2)" >> "$OUT.drift"; chg=$((chg+1)); continue; fi
     ok=$((ok+1))
   done < "$OUT"
-  echo "sentinel verify: ok=$ok missing=$miss changed=$chg (sample $((ok+miss+chg)))"
+  total_rec=$((ok + miss + chg))
+  echo "sentinel verify: ok=$ok missing=$miss changed=$chg (sample $total_rec)"
+  [ "$total_rec" -ge 1 ] || { echo "stage-sentinel: empty sentinel set — refusing to verify" >&2; exit 64; }
   if [ $((miss + chg)) -eq 0 ]; then echo "SENTINELS CLEAN"; else
     echo "SENTINEL DRIFT:"; cat "$OUT.drift"; exit 1
   fi
