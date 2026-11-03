@@ -1,0 +1,27 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -2567,10 +2567,20 @@
+     if let Ok(f) = OpenOptions::new().read(true).write(true).open("/dev/null") {
+         rustix::stdio::dup2_stdin(&f)?;
+         rustix::stdio::dup2_stdout(&f)?;
+-        rustix::stdio::dup2_stderr(&f)?;
+-    }
+-
+-    shrinkers_init();
++        // Opt-in daemon stderr capture: panics and eprintln land somewhere
++        // inspectable instead of /dev/null. Off by default (upstream
++        // semantics preserved); the FreeBSD port runs daemons with it set.
++        // stdin/stdout stay /dev/null so the pipe-EOF concern above stands.
++        let log_path = std::env::var("BCACHEFS_FUSE_LOG").ok().filter(|v| !v.is_empty());
++        let captured = log_path.as_deref().map(|path| {
++            OpenOptions::new().append(true).create(true).open(path)
++                .and_then(|lf| rustix::stdio::dup2_stderr(&lf).map_err(|e| std::io::Error::from(e)))
++        });
++        let fallback = !matches!(captured, Some(Ok(())));
++        if fallback {
++            rustix::stdio::dup2_stderr(&f)?;
++        }
++    }    shrinkers_init();
+ 
+     // process::exit() skips destructors: drop fs explicitly before it.
+     let fuse_fd = match fuse_claim(&fs, &cli.mountpoint, &mount) {
