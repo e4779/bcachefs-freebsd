@@ -96,3 +96,11 @@ library + 16×64M; farm 500×1M×6 ссылок; db 64×64M), fio write 300 c + 
   regression.sh, 17a §3).
 - drill c на full не прогонялся в dry (по плану dry = только b): первый full
   прогон c — отдельная сессия с запасом времени.
+
+## Dogfood-двигатель: dry-ротация ЗЕЛЁНАЯ (2026-11-04 01:58)
+
+Полный цикл за 11.5 мин: corpus-gen (1050 файлов) → fio write+verify (psync) → churn (percentiles: stat p50=0.002ms, hardlink p50=0.041ms, readdir p99=3.2ms) → fio-read (9.3 ГБ/с из кэша) → dbench (160 МБ/с, 4 клиента, xattr/flock живы) → fsx (20k ops чисто) → chaos-дрель b (SIGSTOP→канарейка L0 за 12с→восстановление→сверка чисто). VERDICT 0.
+
+Находки dry-прогона (2 бага двигателя, 0 багов ФС): posixaio EOPNOTSUPP (fusefs без POSIX AIO → psync), CORPUS_SIZE env-mismatch в chaos (ложный дрифт; ФС была чиста).
+
+Следующий шаг: непрерывный soak (mode=full) — по решению владельца утром.
