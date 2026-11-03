@@ -8,7 +8,7 @@ T=$MP/bench-create.$$; mkdir -p $T
 START=$(date +%s%N)
 i=0; while [ $i -lt $N ]; do echo x > "$T/f$i"; i=$((i+1)); done
 END=$(date +%s%N)
-echo "sync-create: $(( (END-START)/1000000/N )) ms/file ($N files)"
+awk -v s=$START -v e=$END -v n=$N 'BEGIN{printf "sync-create: total %.0f ms, %.2f ms/file (%d files)\n", (e-s)/1e6, (e-s)/1e6/n, n}'
 rm -rf $T
 # 2) rename-storm (ed2k-farm pattern)
 T=$MP/bench-rename.$$; mkdir -p $T
@@ -16,7 +16,7 @@ i=0; while [ $i -lt $N ]; do echo x > "$T/f$i"; i=$((i+1)); done
 START=$(date +%s%N)
 i=0; while [ $i -lt $N ]; do mv "$T/f$i" "$T/r$i"; i=$((i+1)); done
 END=$(date +%s%N)
-echo "rename: $(( (END-START)/1000000/N )) ms/file"
+awk -v s=$START -v e=$END -v n=$N 'BEGIN{printf "rename: total %.0f ms, %.2f ms/file\n", (e-s)/1e6, (e-s)/1e6/n}'
 rm -rf $T
 # 3) deep-readdir
 T=$MP/bench-readdir.$$; mkdir -p $T

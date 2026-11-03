@@ -15,7 +15,7 @@
 | T10 | FUSE ro-маунт | ✅ первый bcachefs-маунт на FreeBSD; umount+fsck чисты |
 | T11 core | rw семантика | ✅ write/hardlink(nlink=2)/rename-over/unlink + fsck clean |
 | G2 | FUSE rw + pjdfstest | ✅ **0 failed / 380 passed / 10 expected (chflags) / 125 skipped** + fsck clean (046 errno-host-нумерация, 047 rename-цикл, 045 setattr — три корня G2) |
-| G3 | метаданные < 12.8 мс/файл | ждать G2; bench/ готов |
+| G3 | метаданные < 12.8 мс/файл | ✅ **create+fsync 0.54 мс/файл (~24×), cached 0.01 мс (~1000×), rename 0.19 мс** — fsck после бенча чист. SPINT A ЗАВЕРШЁН |
 
 ## Задачи
 
