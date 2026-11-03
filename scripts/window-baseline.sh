@@ -11,7 +11,7 @@ BIN=$(dirname "$0")/../tools/bcachefs
 mkdir -p "$OUT"
 check() { # dev expected_serial
   dev=$1; want=$2
-  ser=$(doas camcontrol identify "$dev" 2>/dev/null | awk -F': *' '/serial number/{print $2}' | tr -d ' ')
+  ser=$(doas camcontrol identify "$dev" 2>/dev/null | grep -i serial | awk '{print $NF}' | tr -d ' :')
   [ "$ser" = "$want" ] || { echo "SERIAL MISMATCH $dev: got=$ser want=$want — devices moved again, DO NOT proceed"; exit 1; }
 }
 check nda0 50026B7383F5EDA1 || true   # NVMe serial via nda
