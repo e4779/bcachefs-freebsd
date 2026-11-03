@@ -1,0 +1,83 @@
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -396,7 +396,50 @@
+         Err(e) => Err(e),
+     }
+ }
++
++/// Whether @dst_dir is @src itself or inside its subtree - the EINVAL
++/// case of POSIX rename(): a directory may not move into itself. The
++/// Linux VFS rejects it in may_move() before the filesystem is called;
++/// FreeBSD's fusefs(4) forwards the request, so the daemon checks. A
++/// directory has exactly one dirent naming it (bi_dir/bi_dir_offset),
++/// so walking those backpointers up from @dst_dir visits its ancestors,
++/// and only them: meeting @src on the way up means the destination
++/// lives inside the renamed directory. O(depth), capped: past the cap
++/// the answer is "not inside", and rename_trans()'s own checks govern
++/// what follows - a corrupt backpointer loop must not spin the daemon.
++fn rename_dst_inside_src(fs: &Fs, src: c::subvol_inum, dst_dir: c::subvol_inum) -> bool {
++    // A path component costs at least one character plus the separator,
++    // so no honest path is deeper than PATH_MAX/2.
++    const MAX_ANCESTRY: u32 = 512;
++
++    let mut cur = dst_dir;
++    for _ in 0..MAX_ANCESTRY {
++        if cur.subvol == src.subvol && cur.inum == src.inum {
++            return true;
++        }
+ 
++        let Ok(inode) = inode::find_by_inum(fs, cur) else { return false };
++
++        // The walk ends at the filesystem's root, or at an inode no
++        // dirent names, as namei.rs's inum_to_path_up() ends it.
++        if inode.bi_subvol as u64 == BCACHEFS_ROOT_SUBVOL &&
++           inode.bi_inum == BCACHEFS_ROOT_INO {
++            return false;
++        }
++        if inode.bi_dir == 0 && inode.bi_dir_offset == 0 {
++            return false;
++        }
++
++        // A subvolume root is named in its parent subvolume; every other
++        // inode, in its own.
++        if inode.bi_parent_subvol != 0 {
++            cur.subvol = inode.bi_parent_subvol as u64;
++        }
++        cur.inum = inode.bi_dir;
++    }
++    false
++}
++
+ /// Returns the destination inode as the rename left it: for
+ /// BCH_RENAME_OVERWRITE, the one it replaced.
+ fn fuse_rename(
+@@ -1336,7 +1379,29 @@
+         }
+ 
+         let fs = self.fs();
++
++        // EINVAL before any target check, as may_move() orders it: the
++        // destination must not live inside the directory being renamed.
++        // The daemon is single-threaded on FreeBSD, so the walk's
++        // unlocked reads can't race the rename itself.
++        let src_inum = match inode::find_by_inum(fs, src_dir)
++            .and_then(|dir_u| str_hash::hash_info_init(fs, &dir_u))
++            .and_then(|hash_info| dirent::lookup(fs, src_dir, &hash_info, name))
++        {
++            Ok(v)  => v,
++            Err(e) => { reply.error(bch_err(&e)); return; }
++        };
+ 
++        let src_is_dir = match inode::find_by_inum(fs, src_inum) {
++            Ok(src_inode) => src_inode.is_dir(),
++            Err(e)        => { reply.error(bch_err(&e)); return; }
++        };
++
++        if src_is_dir && rename_dst_inside_src(fs, src_inum, dst_dir) {
++            reply.error(Errno::EINVAL);
++            return;
++        }
++
+         // The mode, chosen as bch2_rename2() chooses it. BCH_RENAME means
+         // "there is no target" and isn't checked: renaming onto an existing
+         // name with it inserts a second dirent of that name. The kernel holds
