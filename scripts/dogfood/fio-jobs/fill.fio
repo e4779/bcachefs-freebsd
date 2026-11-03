@@ -4,7 +4,7 @@
 # Placeholders (engine substitutes): __DIR__
 [fill]
 name=fill
-ioengine=posixaio
+ioengine=psync
 buffered=1
 direct=0
 iodepth=1

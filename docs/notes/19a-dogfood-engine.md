@@ -1,0 +1,98 @@
+# 19a — Ф2: dogfood-движок (корпус, шторм, fio, хаос, ротатор)
+
+**Статус: см. §4 (dry-run приёмка).** Движок собирает роли из обзора 18a в один
+ротатор фаз; всё исполнение — ТОЛЬКО внутри `stage-session.sh` (инварианты 15b §5:
+живой пул не-rw, kill-критерии абсолютны, стейдж одноразовый, rctl-капы на тяжёлом).
+
+## 1. Артефакты (`scripts/dogfood/`)
+
+| Файл | Роль | Контракт |
+|---|---|---|
+| `corpus.sh` | детерминированный корпус | `gen\|verify\|epoch-bump <root> [epoch]`; контент = sha256(relpath\|\|epoch), тиленый 32-байтовыми блоками до размера; проверка без хранимых хэшей; профили torrent/library/farm/db; farm: nlink==6; db: append/truncate/overwrite с сохранением инварианта |
+| `churn.sh` | metadata-шторм | `churn.sh <work> <rounds> <batch> <tsv>`; раунд = create/rename (вкл. поверх существующего)/hardlink/unlink/readdir-deep/stat-walk; каждая операция отдельно в TSV (round, op, dt_ms); p50/p95/p99 считает ротатор |
+| `fio-jobs/write-verify.fio` | raw write + verify | verify=sha512, verify_fatal, fdatasync=1, buffered, iodepth≤16 — кейвты FUSE из 18a §2 |
+| `fio-jobs/read.fio` | read-фаза | randread по ТОМУ ЖЕ набору файлов (dir+format+nrfiles/filesize совпадают) |
+| `fio-jobs/fill.fio` | ENOSPC-препаратор | fill_fs=1, отдельный каталог под зачистку |
+| `chaos.sh` | дрели a/b/c | a: kill -9 демона в середине шторма → umount -f → recovery fsck -n → remount (рецептом обёртки, rctl-кап) → verify-subset; b: SIGSTOP → канарейка L0 ≤15 c → CONT → RECOVERED → verify; c: fill → запись должна УПАСТЬ → зачистка → verify |
+| `engine.sh` | ротатор | `engine.sh <image> <mnt> [--mode dry\|full] [--drill a\|b\|c\|none] [--skip ...]`; ВСЕ фазы одной ротации — одна инвокация stage-session.sh; телеметрия → `<session>/engine.log` |
+
+Ротация: `corpus-gen → fio-write-verify → churn → read-phase (corpus-verify +
+fio-read) → dbench (xattr-находки!) → fsx (seed в логе) → chaos-pick-one`.
+Выход ненулевой при любом verify-failure (VERDICT обёртки 3) или провале дрели.
+
+## 2. Ключевые решения
+
+1. **Zvol как image обёртки.** Стейдж-цель — `/dev/zvol/zdata/stage-pool`
+(300G, одноразовый, отформатирован нашим бинарем, fsck-чист). Это
+character-device: обёртка Ф0 принимала только regular files. Минимальное
+расширение `stage-session.sh` (commit 4bc2195): `-c`-image монтируется
+напрямую (без md-прослойки), `<session>/dev` хранит полный путь, fsck -n —
+через doas (zvol = root:operator, пользователь не читает). Файл-путь Ф0
+проверен повторно: VERDICT 0 clean.
+2. **Абсолютные пути в обёртке.** Все mount-table grep'ы обёртки матчат
+абсолютизированные ядром записи; относительный путь молча пропускал
+umount/detach и оставлял живой демон + прицепленный md (найдено пробой,
+вычищено руками, добавлен guard-нормализатор).
+3. **Контент-инвариант вместо хранимых хэшей.** digest = sha256(relpath\|\|epoch);
+файл = digest-tiled до размера. Verify пересчитывает digest из (relpath, epoch)
+и сравнивает чанками — ноль состояния, переносимо, epoch-bump = массовый
+rewrite. db-профил мутирует append/truncate/overwrite'ами, каждый из которых
+остаётся tiled ⇒ инвариант переживает мутации (найдено смоуком: truncate() НЕ
+двигает file position — без явного seek появляется zero-hole; исправлено).
+4. **Per-op тайминги через python3.** FreeBSD date без %N; python3 в хосте есть;
+TSV (round/op/dt_ms) → awk p50/p95/p99 per op-class в engine.log.
+5. **fio-кейвты из 18a зашиты:** buffered-only, iodepth≤16 (fuser
+max_background=16), fdatasync=1 в критичном job (buffered-write ошибки видны
+на вымывании). Сетка глубин — через `FIO_IODEPTH`.
+6. **Tolerant churn для дриллей.** Хаос убивает демон ПОД штормом: ошибки I/O
+тогда — суть дрели; 50 подряд ошибок = tolerated-abort (шторм не крутится
+вхолостую на мёртвом маунте).
+7. **fsx-rs конфиг в сессии:** flen 64 MiB (dry) / 256 MiB (full), align=1
+(байт-точный adversarial), mmap-веса оставлены (writeback-путь — часть
+dogfood), seed фиксируется в engine.log (воспроизводимость).
+8. **Ресурсы:** fio под rctl-капом 3000 (verify-mode ест RAM), dbench/fsx —
+1024, corpus/churn — 1024; перед каждой тяжёлой фазой memgate: ждать ≤600 c
+свободных ≥1 GiB (правило AGENTS), иначе WARN и дальше под капами.
+9. **Канарейка после recovery-remount.** После дрели a канарейка обёртки уже
+вышла (mount-gone): chaos.sh поднимает свою на восстановленном маунте
+(`canary-recovery.log`) — L0-покрытие хвоста сессии.
+
+## 3. Полноформатный runbook (mode=full)
+
+```
+# одна ротация (~25-40 мин нагрузки + fsck-финиш обёртки)
+scripts/dogfood/engine.sh /dev/zvol/zdata/stage-pool \
+  /home/e4779/projects/bcachefs-freebsd/tmp/dogfood-mnt --mode full --drill b
+
+# последующие ротации: чередовать дрели a/b/c (c — считается самой долгой:
+# fill_fs пишет до ENOSPC на ~165+ ГБ свободных, закладывать ≥40-60 мин)
+scripts/dogfood/engine.sh ... --mode full --drill a
+scripts/dogfood/engine.sh ... --mode full --drill c
+
+# повторное использование корпуса (без gen): --skip corpus-gen
+# iodepth-решётка: FIO_IODEPTH=1|4|8|16 scripts/dogfood/engine.sh ...
+```
+
+Параметры full: corpus ~22 GiB (6000 малых + 4×2G torrent; 64 кат×16 файлов
+library + 16×64M; farm 500×1M×6 ссылок; db 64×64M), fio write 300 c + read
+180 c (64×256M), churn 40 раундов×100 (кап 300 c), dbench 8×120 c, fsx
+200k ops / 256 MiB. Каждая ротация оставляет корпус на месте — следующая с
+`--skip corpus-gen` переиспользует (corpus verify фазы read-phase — регресс
+целостности между ротациями).
+
+Вердикты: VERDICT обёртки 0 + `ENGINE RESULT: PASS` в engine.log = зелёная
+ротация. Любой FAIL — разбирать `<session>/engine.log`, findы дриллей —
+строки `FINDING:`. Красная ночь (VERDICT 2) = морозка ступеней (15b §5).
+
+## 4. Dry-run приёмка (mode=dry, drill=b)
+
+<!-- DRYRUN-EVIDENCE -->
+
+## 5. Открытые хвосты
+
+- dbench xattr/extattr через FUSE: находки логируются (`FINDING:` в engine.log),
+  счёт статуса — после первых полных ротаций.
+- pjdfstest-подмножество в ротацию не входит (роль — недельная батарея
+  regression.sh, 17a §3).
+- drill c на full не прогонялся в dry (по плану dry = только b): первый full
+  прогон c — отдельная сессия с запасом времени.

@@ -8,7 +8,7 @@
 # Placeholders (engine substitutes): __DIR__ __RUNTIME__ __IODEPTH__ __NRFILES__ __FILESIZE__
 [write-verify]
 name=write-verify
-ioengine=posixaio
+ioengine=psync
 buffered=1
 direct=0
 iodepth=__IODEPTH__
