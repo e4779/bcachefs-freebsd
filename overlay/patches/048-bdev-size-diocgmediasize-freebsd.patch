@@ -1,0 +1,23 @@
+--- a/src/wrappers/bdev.rs
++++ b/src/wrappers/bdev.rs
+@@ -28,7 +28,20 @@
+ ///
+ /// For block devices, uses BLKGETSIZE64 ioctl.
+ /// For regular files, returns st_size from fstat.
++#[cfg(target_os = "freebsd")]
+ pub fn get_size(fd: RawFd) -> u64 {
++    // FreeBSD geom providers (md, ada, nda, ...) are CHARACTER devices;
++    // st_size is 0 there. DIOCGMEDIASIZE is the canonical size ioctl and
++    // works on any geom-backed fd; regular files fail it (ENOTTY) and
++    // fall through to fstat st_size.
++    let mut size: libc::off_t = 0;
++    if unsafe { libc::ioctl(fd, libc::DIOCGMEDIASIZE, &mut size) } == 0 {
++        return size as u64;
++    }
++    fd_metadata(fd).st_size as u64
++}
++
++#[cfg(not(target_os = "freebsd"))]pub fn get_size(fd: RawFd) -> u64 {
+     let metadata = fd_metadata(fd);
+ 
+     if is_block_device(&metadata) {
