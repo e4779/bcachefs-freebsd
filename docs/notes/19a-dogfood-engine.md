@@ -107,3 +107,7 @@ library + 16×64M; farm 500×1M×6 ссылок; db 64×64M), fio write 300 c + 
 
 ## Q4 ЗАВЕРШЕНО (2026-11-04 02:16)
 zdata/pool-irreplaceable: lib 153G (on-disk, sparse-aware) + seeds-mule 32.1G + снапшот q4-initial. Незаменимое под двойной защитой (ada0, отдельный физический диск от обоих членов пула).
+
+## SOAK PAUSED (2026-11-04 21:10, для сборки-разборки машины)
+13 чистых ротаций, 0 сбоев, RSS 450-584 MB (плато).
+Resume: fresh engine.sh --mode full на /dev/zvol/zdata/stage-pool.
