@@ -111,3 +111,6 @@ zdata/pool-irreplaceable: lib 153G (on-disk, sparse-aware) + seeds-mule 32.1G + 
 ## SOAK PAUSED (2026-11-04 21:10, для сборки-разборки машины)
 13 чистых ротаций, 0 сбоев, RSS 450-584 MB (плато).
 Resume: fresh engine.sh --mode full на /dev/zvol/zdata/stage-pool.
+
+## SOAK PAUSED #2 (ночная тишина, 2026-11-05)
+13+3=16 чистых ротаций суммарно, 0 сбоев. Resume: engine.sh --mode full.
