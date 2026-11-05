@@ -117,3 +117,6 @@ Resume: fresh engine.sh --mode full на /dev/zvol/zdata/stage-pool.
 
 ## SOAK PAUSED #3 (reboot, 2026-11-05 ~12:00)
 20 clean rotations total (13+3+4). RSS: 561-621 MB corridor. Resume: engine.sh --mode full.
+
+## SOAK PAUSED #4 (reboot, 2026-11-05 ~19:30)
+26 clean rotations total. RSS plateau 540-575 MB. Resume: engine.sh --mode full.
