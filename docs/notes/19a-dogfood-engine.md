@@ -170,3 +170,19 @@ All corpus verifies 100%. All tools (fio verify, dbench, fsx) passed every rotat
   Правильно: doas sh -c "BCACHEFS_FUSE_LOG=... exec ..." или setenv в doas.conf.
 - Ротация: /etc/newsyslog.conf.d/p2p-stack.conf (qbt/amut/amuled/stash, 10M x5, copy-truncate).
 - Монитор v4: rss/stash/qbt/dl-up/free/kerr + ежечасная проверка пробы (sha256).
+
+## ИНЦИДЕНТ #1: потерянный FUSE write-ответ (2026-11-06 ~02:30, daemon 96931)
+
+Симптом: qbt (поток libtorrent-network) навсегда завис в fuse_write_directbackend -> fdisp_wait_answ.
+WebUI qbt молчал (000), процесс жив. Kill -9 спасает, но restart натыкается на тот же путь при загрузке resume.
+
+Диагноз (артефакты: tmp/fuse-stall-incident1/):
+- Демон ВСЕ потоки idle (procstat -kk) — запрос не обрабатывался
+- FUSE-лог не содержит зависший WRITE — демон его НЕ ПОЛУЧАЛ
+- => запрос потерян kernel->daemon (канал /dev/fuse), ответ не придёт никогда, клиент без таймаута
+
+Гипотеза: race в fuser (класс destroy-before-reply, cberner/fuser#29) — пропуск чтения
+из /dev/fuse под нагрузкой. Воспроизводимость: 2+ зависания за вечер (WebUI-голодания).
+
+Следующие шаги: (1) воспроизвести под sysctl vfs.fusefs debug, (2) таймаут-обход на
+стороне клиента не существует => нужен фикс демона, (3) кандидаты: fuser форк upstream.
