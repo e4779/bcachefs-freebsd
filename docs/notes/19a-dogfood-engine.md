@@ -127,3 +127,17 @@ Resume: fresh engine.sh --mode full на /dev/zvol/zdata/stage-pool.
 All corpus verifies 100%. All tools (fio verify, dbench, fsx) passed every rotation.
 
 Ф2-exit criteria MET. Next: Ф3 (stash write on FUSE).
+
+## RO-окно #2: полный прод-сервис на живом пуле (2026-11-05, в ходу)
+
+- stash v0.32.0-hlab.2: UI+GraphQL+стрим 73MB/s, scan+generate (job FINISHED)
+- qbittorrent-nox: сидирование на ro, WebUI :8094, соединения живут
+- FUSE metadata: 477k files/s (walk), 9k/s (stat), 700/s (open+read) — против x10.7 налога NFS
+- Демон RSS: 1.7-1.9GB (кэш полной библиотеки), кэп 2500 держит
+- Записи на пул: НОЛЬ за всё окно (gstat-сторож + EROFS-проба)
+
+### Бэкап-факт для rw-решения (подтверждён владельцем 2026-11-06)
+- Незаменимое = lib/* (вся кураторская библиотека, вкл. lib/music 85G) + seeds/mule = 184G,
+  НА ДРУГОМ ДИСКЕ (zdata/pool-irreplaceable, ada0, свежий 2026-11-03).
+- Остальные ~2.2T (seeds/adult, music, misc, movies, ed2k_share, migration) = перекачиваемое p2p.
+- Вывод: rw-риск на живом пуле = риск времени/трафика, НЕ данных.
