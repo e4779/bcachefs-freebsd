@@ -164,3 +164,9 @@ All corpus verifies 100%. All tools (fio verify, dbench, fsx) passed every rotat
 - Сервисные маунты дальше: rlimit-run.sh 4000, не 2500.
 - nice 19 в сервисном режиме запрещён (шрам шторма 01:05) — только nice 0.
 - Демон под rctl-кэпом при превышении: malloc ENOMEM -> abort (смерть, не замедление).
+
+### Логирование Ф3 (2026-11-06 01:25)
+- УРОК: BCACHEFS_FUSE_LOG потерялась через doas (doas чистит env) — FUSE-опс-лог не ведётся до следующего ремоунта.
+  Правильно: doas sh -c "BCACHEFS_FUSE_LOG=... exec ..." или setenv в doas.conf.
+- Ротация: /etc/newsyslog.conf.d/p2p-stack.conf (qbt/amut/amuled/stash, 10M x5, copy-truncate).
+- Монитор v4: rss/stash/qbt/dl-up/free/kerr + ежечасная проверка пробы (sha256).
