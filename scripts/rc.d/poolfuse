@@ -1,0 +1,94 @@
+#!/bin/sh
+# poolfuse — live bcachefs pool via FreeBSD FUSE port (Ф3 dogfood, 2026-11-06)
+# Replaces the VM NFS bridge (poolmount) for /mnt/pool.
+# Serial guard: adaN names rot across replumbs, serials don't (homelab G8 rule).
+
+# REQUIRE: FILESYSTEMS
+# BEFORE: DAEMON
+# KEYWORD: nojail
+
+. /etc/rc.subr
+
+name="poolfuse"
+rcvar="poolfuse_enable"
+desc="Mount live bcachefs pool (NVMe+HDD by serial) via bcachefs FUSE port"
+
+load_rc_config "$name"
+: ${poolfuse_enable:=NO}
+: ${poolfuse_dev_nvme:="/dev/nda0p3"}
+: ${poolfuse_dev_hdd:="/dev/ada1"}
+: ${poolfuse_hdd_serial:="41OYK6J4FAYG"}
+: ${poolfuse_mountpoint:="/mnt/pool"}
+: ${poolfuse_tools:="/home/e4779/projects/bcachefs-freebsd"}
+: ${poolfuse_cap_mb:=8000}
+: ${poolfuse_wait_s:=45}
+
+start_cmd="poolfuse_start"
+stop_cmd="poolfuse_stop"
+
+poolfuse_mount_attempt()
+{
+    (
+        cd "$poolfuse_tools" || exit 1
+        export BCACHEFS_FUSE_LOG=/var/log/bcachefs-fuse.log
+        ./scripts/rlimit-run.sh "$poolfuse_cap_mb" ./tools/bcachefs mount \
+            -o fuse,allow_other \
+            "$poolfuse_dev_nvme:$poolfuse_dev_hdd" "$poolfuse_mountpoint"
+    ) >>/var/log/poolfuse-start.log 2>&1 &
+}
+
+poolfuse_wait()
+{
+    i=0
+    while [ $i -lt $poolfuse_wait_s ]; do
+        if mount | grep -q " ${poolfuse_mountpoint} "; then
+            return 0
+        fi
+        sleep 1
+        i=$((i+1))
+    done
+    return 1
+}
+
+poolfuse_start()
+{
+    if mount | grep -q " ${poolfuse_mountpoint} "; then
+        echo "${name}: already mounted"
+        return 0
+    fi
+    kldload -n fusefs 2>/dev/null
+    SER=$(camcontrol identify "$poolfuse_dev_hdd" 2>/dev/null | awk '/serial/{print $NF}')
+    if [ "$SER" != "$poolfuse_hdd_serial" ]; then
+        echo "${name}: SERIAL MISMATCH $poolfuse_dev_hdd=$SER (want $poolfuse_hdd_serial) — refusing"
+        return 1
+    fi
+    [ -c "$poolfuse_dev_nvme" ] || { echo "${name}: $poolfuse_dev_nvme missing"; return 1; }
+    echo "Mounting bcachefs pool (cap ${poolfuse_cap_mb}MB)"
+    poolfuse_mount_attempt
+    if poolfuse_wait; then
+        echo "${name}: mounted"
+        return 0
+    fi
+    echo "${name}: first attempt failed, retrying once (see /var/log/poolfuse-start.log)"
+    poolfuse_mount_attempt
+    if poolfuse_wait; then
+        echo "${name}: mounted (retry)"
+        return 0
+    fi
+    echo "${name}: mount did not appear in $((poolfuse_wait_s * 2))s"
+    return 1
+}
+
+poolfuse_stop()
+{
+    if ! mount | grep -q " ${poolfuse_mountpoint} "; then
+        echo "${name}: not mounted"
+        return 0
+    fi
+    echo "Unmounting ${poolfuse_mountpoint}"
+    umount "$poolfuse_mountpoint" && return 0
+    sleep 5
+    umount -f "$poolfuse_mountpoint"
+}
+
+run_rc_command "$1"
