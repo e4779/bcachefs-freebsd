@@ -157,3 +157,10 @@ All corpus verifies 100%. All tools (fio verify, dbench, fsx) passed every rotat
 - монитор: /tmp/f3-monitor.sh (RSS/сервисы/ошибки, алармы)
 
 Проба хранится как /mnt/pool/.f3-probe/ — кросс-валидация Linux-стороной при возврате VM.
+
+### rctl-урок (2026-11-06 01:30)
+- Сервисный режим демона: кэп 2500 оказался тесным (btree-кэш библиотеки дорос до 2429MB за чек-волну).
+- Живой swap правила: rctl -r process:PID:memoryuse:deny=старое; rctl -a ...deny=4294967296 (4G).
+- Сервисные маунты дальше: rlimit-run.sh 4000, не 2500.
+- nice 19 в сервисном режиме запрещён (шрам шторма 01:05) — только nice 0.
+- Демон под rctl-кэпом при превышении: malloc ENOMEM -> abort (смерть, не замедление).
