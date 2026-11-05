@@ -141,3 +141,19 @@ All corpus verifies 100%. All tools (fio verify, dbench, fsx) passed every rotat
   НА ДРУГОМ ДИСКЕ (zdata/pool-irreplaceable, ada0, свежий 2026-11-03).
 - Остальные ~2.2T (seeds/adult, music, misc, movies, ed2k_share, migration) = перекачиваемое p2p.
 - Вывод: rw-риск на живом пуле = риск времени/трафика, НЕ данных.
+
+## Ф3-LIVE START: первый rw на живом пуле (2026-11-06 00:45)
+
+Решение владельца: бэкап незаменимого закрыт (lib+mule=184G, zdata, 2026-11-03),
+остальное перекачиваемо => rw-риск = риск времени, не данных. VM (ремонтный инструмент)
+пересобирается, откат = reformat + restore (задокументирован).
+
+Лестница принята:
+- write-probe 200MB: checksum MATCH, fsync ok
+- umount -> super seq 19611->19631, Clean:1
+- fsck -n: CLEAN (journal seq 10762292)
+- probe пережил umount/fsck/mount с той же суммой
+- stash (302) + qbittorrent (200) подняты на rw-маунте
+- монитор: /tmp/f3-monitor.sh (RSS/сервисы/ошибки, алармы)
+
+Проба хранится как /mnt/pool/.f3-probe/ — кросс-валидация Linux-стороной при возврате VM.
