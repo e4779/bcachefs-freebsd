@@ -120,3 +120,10 @@ Resume: fresh engine.sh --mode full на /dev/zvol/zdata/stage-pool.
 
 ## SOAK PAUSED #4 (reboot, 2026-11-05 ~19:30)
 26 clean rotations total. RSS plateau 540-575 MB. Resume: engine.sh --mode full.
+
+# 🎯 Ф2 SOAK COMPLETE — 30 CLEAN ROTATIONS (2026-11-05 23:48)
+
+30/30 green. 0 failures. RSS 450-621 MB (plateau, no leak). All chaos drills green.
+All corpus verifies 100%. All tools (fio verify, dbench, fsx) passed every rotation.
+
+Ф2-exit criteria MET. Next: Ф3 (stash write on FUSE).
