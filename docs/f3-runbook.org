@@ -16,11 +16,14 @@
 - Рычаг mount -u -o timeout=30: ПРОВЕРЕН вживую, rc=0 (совет считал EOPNOTSUPP — на этом ядре работает; эффект по циклам wedge уточнить).
 Вердикт по вопросу владельца: ~70% day-1 инфры легитимно (охота), дрейф в 4 маркерах: ослепление монитора на qbt, рычаг, отсутствие тройки приёмки (KPI/expiry/rollback-триггер), остывающий репро 3/3.
 
-** NEXT P0: catcher v2 — umtx-адреса через truss/dtrace + майнинг 3 китов :wedge:
-Подтвердить механику reply-path failure -> брошенный мьютекс -> смерть single-reader. Главные подозреваемые: forget-guard fusemount.rs:901, nodes-Mutex :878, writev-error -> error!() (reply.rs:121).
-** NEXT P1: reply-path hardening + deadline-слой одной работой :port:
+** DONE P0: root-cause найден — core-дамп вскрыт lldb :wedge:
+Цепочка (lldb core, поток fuser-0): FUSE read(ino 2147514231) -> __bch2_read_extent -> bch2_bucket_io_time_reset(dev 0, bucket 244817) -> btree-trans commit -> six_unlock_write -> six_unlock_ip -> atomic_sub_return_release(SIX_LOCK_write) -> LIVELOCK в atomic.h:298 (ATOMIC64_SPINLOCK FreeBSD-шим). Reader мёртв => FS замерла => тикеты 60с умирают => вечный redirty. Триггер: контенция при мульти-клиентском бёрсте. НЕ fuser/writev/nodes-Mutex (writev-retry дал 0 событий; class-3 отвергнут).
+Уроки: catcher-v2 truss УБИВАЛ демона SIGTRAP при detach (signal 5, core dumped — случайно дало лучший артефакт); v3 без truss; core-дамп через kill -5 = легитимный инструмент (с остановкой heal).
+** WAITING P1: reply-path hardening + deadline-слой одной работой :port:
+Сборка идёт: fuser-vendored (writev bounded retry 5×10ms, EAGAIN/EWOULDBLOCK/EINTR/ENOMEM) + Cargo.toml path-dep. Deadline-слой (watchdog/heartbeat) — после оценки эффекта retry на живом.
 C+B: destroy-before-reply семантика (fuser#757, форк koverstreet) + writev-retry + reply-registry/watchdog/reader-heartbeat. Сверить escape-коды с fuse_io.c. Это root-cause фикс Shape-1.
-** TODO P2: E-lite автоматизация рычага с sunset :ops:
+** NEXT P2: f3-heal.sh супервизор задеплоен, sunset 2 недели :ops:
+Триггеры: демон мёртв ИЛИ wedge >5 мин -> полный bounce стека (включая qbt — с retry-фиксом бёрст-триггер должен уйти; если флапает — sunset-пересмотр).
 Только mount -u timeout=30 -> supervised рестарт ДЕМОНА (не клиентов! рестарт qbt = 3/3 триггер). Sunset 2 недели без wedge. Тройка приёмки: KPI + expiry + письменно предзаписанный rollback-триггер.
 ** TODO P3: поименованный мьютекс-фикс, staggered fastresume qbt, Ф4-дрели :port:soak:
 ** CANCELLED D: ядерная политика fail-fast — отклонена советом (redirty by design = data safety)
@@ -35,16 +38,15 @@ fusemount.rs:2340-2375 сверяет f_mntfromname с одиночным пут
 :ID:       2a93749a-d986-11f1-a363-9c6b00bdbaa5
 :END:
 Доказанный механизм wedge: fdisp_wait_answ таймаутит (60с) → fuse_io_strategy редиртит буфер (fuse_io.c:896-902) + biobackend goto again (:602-607) → вечный цикл, очередь ms_head растёт. Триггер в демоне: event-loop застревает в umtx (инцидент #1: ни один поток в read(/dev/fuse)). Инструмент: скрипт-сторож (стеки демона через procstat -kk при обнаружении потока клиента в fdisp_wait_answ >N мин + sndump/поиск владельца мьютекса), деплой в scripts/.
-** TODO Демон-дедлок: root-cause и фикс по данным wedge-catcher :port:wedge:
+** CANCELLED Демон-дедлок (отдельная задача): поглощена P0/P1 совета
 :PROPERTIES:
 :BLOCKER: id:wedge-catcher
 :END:
-Гипотезы: fuser destroy-before-reply класс (cberner/fuser#757, koverstreet форк), мьютекс брошенный паникующим тредом. Без поимки не чинится.
+Поглощено P0 (поимка) + P1 (фикс) — совет 2026-11-06.
 ** TODO amuled: вернуть svcj после стабилизации :svcj:
 amuled_svcj=NO временно (2026-11-06, утренний хаос был мусором обёрток, не svcj; но при чистом состоянии проверяем сначала вручную).
 ** WAITING Linux-кросс-валидация наших rw-записей :vm:
 Ждём: пересборка bcachefs-vm (параллельная сессия). Затем: VM монтирует пул, fsck Linux-стороной, чтение /mnt/pool/.f3-probe/f001-200mb.bin — сверка sha256 599b9472… с обеих сторон.
-** TODO Ф4: краш-дрели на rw (kill -9 демона под записью, ENOSPC, fsck после каждой беды) :soak:
 ** SOMEDAY NFS-мост (poolmount + VM diod) на пенсию: FUSE-порт = единственный прод-путь :migration:
 
 * Исследование (зафиксировано 2026-11-06, источники — исходники releng/15.1 + клон tools + gh)

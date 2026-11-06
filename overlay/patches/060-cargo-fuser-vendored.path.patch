@@ -1,0 +1,6 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@
+-fuser = { git = "https://github.com/koverstreet/fuser", branch = "destroy-before-reply" }
++# fuser = { git = "https://github.com/koverstreet/fuser", branch = "destroy-before-reply" }
++fuser = { path = "fuser-vendored" }  # vendored: + writev reply-retry (F3 wedge class-3 fix)

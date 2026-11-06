@@ -22,6 +22,7 @@ load_rc_config "$name"
 : ${poolfuse_tools:="/home/e4779/projects/bcachefs-freebsd"}
 : ${poolfuse_cap_mb:=8000}
 : ${poolfuse_wait_s:=90}
+: ${poolfuse_fuse_log:=}
 
 start_cmd="poolfuse_start"
 stop_cmd="poolfuse_stop"
@@ -30,7 +31,7 @@ poolfuse_mount_attempt()
 {
     (
         cd "$poolfuse_tools" || exit 1
-        export BCACHEFS_FUSE_LOG=/var/log/bcachefs-fuse.log
+        [ -n "$poolfuse_fuse_log" ] && export BCACHEFS_FUSE_LOG=$poolfuse_fuse_log
         ./scripts/rlimit-run.sh "$poolfuse_cap_mb" ./tools/bcachefs mount \
             -o fuse,allow_other \
             "$poolfuse_dev_nvme:$poolfuse_dev_hdd" "$poolfuse_mountpoint"
