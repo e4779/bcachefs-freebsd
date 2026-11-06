@@ -260,12 +260,9 @@ impl<FS: Filesystem> Session<FS> {
 
         let n_threads = config.n_threads.unwrap_or(1);
 
-        if !cfg!(target_os = "linux") && n_threads != 1 {
-            // TODO: check whether it works on macOS/FreeBSD and enable if it works.
-            return Err(io::Error::other(
-                "n_threads != 1 is only supported on Linux",
-            ));
-        }
+        // FreeBSD: fuse(4) ms_pop is serialized under ms_mtx, so concurrent
+        // preadv on the shared /dev/fuse fd each dequeue distinct requests.
+        // Multi-threaded dispatch is safe with clone_fd=false (shared fd).
 
         let Some(n_threads_minus_one) = n_threads.checked_sub(1) else {
             return Err(io::Error::other("n_threads"));
