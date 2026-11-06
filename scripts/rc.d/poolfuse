@@ -21,7 +21,7 @@ load_rc_config "$name"
 : ${poolfuse_mountpoint:="/mnt/pool"}
 : ${poolfuse_tools:="/home/e4779/projects/bcachefs-freebsd"}
 : ${poolfuse_cap_mb:=8000}
-: ${poolfuse_wait_s:=45}
+: ${poolfuse_wait_s:=90}
 
 start_cmd="poolfuse_start"
 stop_cmd="poolfuse_stop"
@@ -65,16 +65,17 @@ poolfuse_start()
     [ -c "$poolfuse_dev_nvme" ] || { echo "${name}: $poolfuse_dev_nvme missing"; return 1; }
     echo "Mounting bcachefs pool (cap ${poolfuse_cap_mb}MB)"
     poolfuse_mount_attempt
-    if poolfuse_wait; then
-        echo "${name}: mounted"
-        return 0
-    fi
-    echo "${name}: first attempt failed, retrying once (see /var/log/poolfuse-start.log)"
-    poolfuse_mount_attempt
-    if poolfuse_wait; then
-        echo "${name}: mounted (retry)"
-        return 0
-    fi
+    n=0
+    while [ $n -lt 3 ]; do
+        if poolfuse_wait; then
+            echo "${name}: mounted (attempt $((n+1)))"
+            return 0
+        fi
+        n=$((n+1))
+        echo "${name}: attempt $n failed, retrying (see /var/log/poolfuse-start.log)"
+        sleep 2
+        poolfuse_mount_attempt
+    done
     echo "${name}: mount did not appear in $((poolfuse_wait_s * 2))s"
     return 1
 }

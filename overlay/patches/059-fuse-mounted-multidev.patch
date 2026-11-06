@@ -1,0 +1,19 @@
+--- a/src/commands/fusemount.rs	2026-11-06 09:08:33.513727000 +0700
++++ tools/src/commands/fusemount.rs	2026-11-06 09:04:21.347832000 +0700
+@@ -2359,9 +2359,15 @@
+     if n < 1 {
+         return false;
+     }
++    // Multi-device mounts report f_mntfromname as a colon-joined device
++    // list ("/dev/nda0p3:/dev/ada1"): match per-member, not whole-string,
++    // or a healthy mounted daemon is misread as "stale shutting-down mount"
++    // (lock_devices falls to the WAIT_MAX arm => boot-time mount failure).
+     (0..n as usize).any(|i| {
+         let m = unsafe { &*mntbuf.add(i) };
+-        name(&m.f_fstypename).starts_with("fuse") && name(&m.f_mntfromname) == dev
++        let from = name(&m.f_mntfromname);
++        name(&m.f_fstypename).starts_with("fuse")
++            && (from == dev || from.split(':').any(|part| part == dev))
+     })
+ }
+ 

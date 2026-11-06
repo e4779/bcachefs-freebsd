@@ -1,0 +1,40 @@
+#+TODO: TODO NEXT WAITING SOMEDAY | DONE CANCELLED
+#+TITLE: Ф3 dogfood runbook — порт bcachefs на живом прод-пуле
+#+FILETAGS: :f3:dogfood:
+
+Живой документ Ф3: пул (nda0p3:ada1, 4.7T, формат 1.39) смонтирован rw через FUSE-порт, прод-стек (stash/qbittorrent/amuled/amutorrent) работает на нём с 2026-11-06. Автозапуск: poolfuse → amuled → stash → qbittorrent → amutorrent (rcorder, svcj). Исторический журнал (до org-эры): docs/notes/19a-dogfood-engine.md.
+
+Текучка: демон rctl 8G (rule на pid), монитор /tmp/f3-monitor.sh (пересоздаётся после ребута — скрипт в tmp/), heartbeat tmp/f3-heartbeat.log. Rescue-рычаг при wedge: mount -u -o timeout=N /mnt/pool (переводит вечный redirty-цикл в фейлящиеся записи; fuse_vfsops.c:237 update path).
+
+* Задачи
+** NEXT Fix A: fuse_mounted multi-device false-negative :port:boot:
+fusemount.rs:2340-2375 сверяет f_mntfromname с одиночным путём девайса; на multi-device там склеенная строка /dev/nda0p3:/dev/ada1 => никогда true => здоровый маунт не распознан => arm "shutting down" => 300s => boot-fail. Фикс: сверять по mntonname (маунт-поинт). Overlay-патч, пересборка tools, деплой без ребута (umount/remount + рестарт сервисов).
+** NEXT Fix B: wedge-catcher — поймать владельца umtx при следующем зависании :port:wedge:
+:PROPERTIES:
+:ID:       2a93749a-d986-11f1-a363-9c6b00bdbaa5
+:END:
+Доказанный механизм wedge: fdisp_wait_answ таймаутит (60с) → fuse_io_strategy редиртит буфер (fuse_io.c:896-902) + biobackend goto again (:602-607) → вечный цикл, очередь ms_head растёт. Триггер в демоне: event-loop застревает в umtx (инцидент #1: ни один поток в read(/dev/fuse)). Инструмент: скрипт-сторож (стеки демона через procstat -kk при обнаружении потока клиента в fdisp_wait_answ >N мин + sndump/поиск владельца мьютекса), деплой в scripts/.
+** TODO Демон-дедлок: root-cause и фикс по данным wedge-catcher :port:wedge:
+:PROPERTIES:
+:BLOCKER: id:wedge-catcher
+:END:
+Гипотезы: fuser destroy-before-reply класс (cberner/fuser#757, koverstreet форк), мьютекс брошенный паникующим тредом. Без поимки не чинится.
+** TODO amuled: вернуть svcj после стабилизации :svcj:
+amuled_svcj=NO временно (2026-11-06, утренний хаос был мусором обёрток, не svcj; но при чистом состоянии проверяем сначала вручную).
+** WAITING Linux-кросс-валидация наших rw-записей :vm:
+Ждём: пересборка bcachefs-vm (параллельная сессия). Затем: VM монтирует пул, fsck Linux-стороной, чтение /mnt/pool/.f3-probe/f001-200mb.bin — сверка sha256 599b9472… с обеих сторон.
+** TODO Ф4: краш-дрели на rw (kill -9 демона под записью, ENOSPC, fsck после каждой беды) :soak:
+** SOMEDAY NFS-мост (poolmount + VM diod) на пенсию: FUSE-порт = единственный прод-путь :migration:
+
+* Исследование (зафиксировано 2026-11-06, источники — исходники releng/15.1 + клон tools + gh)
+Полную выжимку с file:line см. docs/notes/19a-dogfood-engine.md «РАЗГОВОР С ИСТОЧНИКАМИ». Ключевое:
+- fuser read-loop надёжен (EAGAIN/EINTR ретраи; partial read убивает сессию, не теряет сообщение); молчаливая потеря возможна только в reply-пути (writev err → kernel ждёт unique вечно).
+- Kernel-side lost-wakeup исключён (push+wakeup под одним ms_mtx).
+- Утечки svcj-jail при out-of-band kill: чистится только service X onestop (внутри него jail -r); console-логи сервисов в /var/log/svcj_<name>_console.log.
+- Инциденты #1/#2: артефакты tmp/fuse-stall-incident{1,2}/.
+
+* Журнал Ф3
+- 2026-11-06 00:42 — первый rw на живом пуле: 200MB probe checksum MATCH, fsck -n clean, seq 19611→19631.
+- 2026-11-06 01:0x — инцидент #1 (wedge qbt write), артефакты сняты.
+- 2026-11-06 08:0x — boot-autostart настроен (poolfuse rc.d, rlimit root-aware — doas режет env и denies root→root), amuled-хаос = каскад обёрток, единственный реальный фатал — boot при пустом маунте.
+- 2026-11-06 09:0x — диагноз wedge и boot-fail из исходников (два исследователя), rescue-рычаг задокументирован.
