@@ -27,6 +27,9 @@ C+B: destroy-before-reply семантика (fuser#757, форк koverstreet) +
 Триггеры: демон мёртв ИЛИ wedge >5 мин -> полный bounce стека (включая qbt — с retry-фиксом бёрст-триггер должен уйти; если флапает — sunset-пересмотр).
 Только mount -u timeout=30 -> supervised рестарт ДЕМОНА (не клиентов! рестарт qbt = 3/3 триггер). Sunset 2 недели без wedge. Тройка приёмки: KPI + expiry + письменно предзаписанный rollback-триггер.
 ** TODO P3: поименованный мьютекс-фикс, staggered fastresume qbt, Ф4-дрели :port:soak:
+** TODO P4: внутренняя телеметрия пула — QUERY_ACCOUNTING через FUSE (hlmon-наследие) :port:telemetry:
+Debian-эпоха: tools/hlmon (Rust, sysfs) собирал copygc_waiting/reconcile_blocked/reconcile_target_pending + fs usage. На порту все fs usage/top/timestats сейчас падают: CLI идёт по linux-путям (BcachefsHandle::open → sysfs_fd + query_accounting ioctl; на /mnt/pool → 'Is a directory' → device-open → 'kernel module not loaded').
+Ключ: метрики hlmon (очередь reconcile = reconcile_work, drain/dev_leaving) живут в BCACHEFS_IOC_QUERY_ACCOUNTING — ОДИН ioctl через FUSE-passthrough (fuser ll/ioctl.rs уже вендорен) открывает всё семейство: fs usage -a (replicas/btree/compression/reconcile/devices). Фаза 2: fs top/timestats (перф-счётчики). Interim: SIGINFO-дамп внутренних счётчиков демона в local1-лог (FreeBSD-канон, патч fusemount.rs).
 ** CANCELLED D: ядерная политика fail-fast — отклонена советом (redirty by design = data safety)
 ** WAITING F: break-glass откат на VM/NFS-мост — невозможен пока VM пересобирается; числовой триггер предзаписать
 ** TODO Апстрим: киты -> fuser#29/#757 + koverstreet форк :upstream:
