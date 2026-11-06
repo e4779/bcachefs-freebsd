@@ -28,6 +28,12 @@ C+B: destroy-before-reply семантика (fuser#757, форк koverstreet) +
 Только mount -u timeout=30 -> supervised рестарт ДЕМОНА (не клиентов! рестарт qbt = 3/3 триггер). Sunset 2 недели без wedge. Тройка приёмки: KPI + expiry + письменно предзаписанный rollback-триггер.
 ** TODO P3: поименованный мьютекс-фикс, staggered fastresume qbt, Ф4-дрели :port:soak:
 ** TODO P4: внутренняя телеметрия пула — QUERY_ACCOUNTING через FUSE (hlmon-наследие) :port:telemetry:
+Разведка P4.0 завершена (tmp/p4/{gate,ioctl,daemon}.md — file:line карта):
+- ДЕМОН: fs_ioctl(chardev.rs:71) уже умеет query_accounting/ counters из живой памяти; нужен только мост.
+- FUSER: restricted-FUSE_IOCTL парсинг/диспетч/ReplyIoctl ГОТОВЫ; GAP: impl Filesystem не переопределяет ioctl, fuse3-колбэк не выставлен.
+- ЯДРО: fuse_vnop_ioctl = ENOTTY (TODO implement FUSE_IOCTL) — главный блокер; FUSE_IOCTL=39 определён, но никогда не эмитится; bit-layout BCH_IOCTL совместим (0x4020BC15/25).
+- CLI: гейт path_subvol cfg(freebsd)=None (util.rs:77) + /sys-зависимости.
+План: P4.1 userspace-быстрые (A: fstype-гейт fusefs.bcachefs; B: state-file /var/run/bcachefs-fuse/<uuid>.json — uuid/members из демона, twin fs_get_devices) → P4.2 ЯДРО: restricted FUSE_IOCTL в fusefs(4) (патч №3, копия fsess_maybe_impl-паттерна; staging-тест, ребут-окно) → P4.3 мост fuser→fs_ioctl + fuse3 callback → P4.4 приёмка: fs usage -a /mnt/pool live == df-кроссчек, subvolume list живой → P4.5 fs top/timestats + poolwatch-тик. Alternative (отложена): side-channel ctl-fd без ядра.
 Debian-эпоха: tools/hlmon (Rust, sysfs) собирал copygc_waiting/reconcile_blocked/reconcile_target_pending + fs usage. На порту все fs usage/top/timestats сейчас падают: CLI идёт по linux-путям (BcachefsHandle::open → sysfs_fd + query_accounting ioctl; на /mnt/pool → 'Is a directory' → device-open → 'kernel module not loaded').
 Ключ: метрики hlmon (очередь reconcile = reconcile_work, drain/dev_leaving) живут в BCACHEFS_IOC_QUERY_ACCOUNTING — ОДИН ioctl через FUSE-passthrough (fuser ll/ioctl.rs уже вендорен) открывает всё семейство: fs usage -a (replicas/btree/compression/reconcile/devices). Фаза 2: fs top/timestats (перф-счётчики). Interim: SIGINFO-дамп внутренних счётчиков демона в local1-лог (FreeBSD-канон, патч fusemount.rs).
 ** CANCELLED D: ядерная политика fail-fast — отклонена советом (redirty by design = data safety)
