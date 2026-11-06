@@ -1,0 +1,474 @@
+--- /dev/null
++++ b/src/commands/fusemount/telemetry.rs
+@@ -0,0 +1,391 @@
++// SPDX-License-Identifier: GPL-2.0
++
++//! Daemon-side telemetry for the FreeBSD FUSE port (P4 phase 0).
++//!
++//! SIGINFO (FreeBSD) / SIGUSR2 dump of the live accounting and counters,
++//! written to the daemon's stderr log (BCACHEFS_FUSE_LOG in daemon mode).
++//!
++//! Design constraints, from the P4 plan-of-record (docs/f3-runbook.org):
++//!
++//! - The handler itself must be async-signal-safe and can never panic or
++//!   allocate: an rctl memoryuse violation SIGKILLs the daemon, which kills
++//!   the mount. So the handler only write(2)s one byte to a self-pipe; a
++//!   dedicated thread does all the reading and formatting.
++//! - Reads of the filesystem are EXTERNAL only: accounting::mem_read() and
++//!   the percpu counter reads. No mark_lock (usage_read_short() and
++//!   bch2_fs_accounting_read() take it for read - a background writer could
++//!   stall behind us), so per-replicas-entry totals are out of reach here;
++//!   the statically enumerable positions carry the same signal.
++//! - Bounded output: one summary line plus at most 64 lines total.
++//! - No unwrap()/expect()/panicking indexing anywhere in this module.
++
++use std::ffi::c_int;
++use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
++use std::sync::Arc;
++use std::thread::{self, JoinHandle};
++
++use bch_bindgen::c;
++use bcachefs_kernel::accounting;
++use bcachefs_kernel::fs::Fs;
++use bcachefs_kernel::util::rcu;
++
++use super::ensure_thread_init;
++
++/// The write end of the self-pipe, as a raw fd the handler can write(2).
++///
++/// Installed once, at mount; never closed - the process outlives the mount
++/// and a later signal must not write to a recycled fd number. -1 = not
++/// installed (handler not yet registered, or the telemetry thread never
++/// came up); the handler then does nothing.
++static SIGINFO_PIPE_W: AtomicI32 = AtomicI32::new(-1);
++
++/// The read end, for the telemetry thread. Set together with the write end;
++/// owned by the thread (dropped when it exits).
++static SIGINFO_PIPE_R: AtomicI32 = AtomicI32::new(-1);
++
++/// SIGINFO's default action on FreeBSD dumps process info from the kernel;
++/// SIGUSR2's default is to kill. Both are repurposed here as "dump
++/// telemetry": SIGINFO is the FreeBSD-native status key (ctrl-T), SIGUSR2
++/// exists everywhere and is what a test script can raise(2).
++extern "C" fn siginfo_handler(_sig: c_int) {
++    // Async-signal-safe: write(2) only. A full pipe (64K pending dumps)
++    // returns EAGAIN and the byte is dropped - dumps coalesce, which is
++    // what we want. The fd is never closed, so it can't be recycled under
++    // us; the load is a plain word read.
++    let fd = SIGINFO_PIPE_W.load(Ordering::Relaxed);
++    if fd >= 0 {
++        let b: u8 = 1;
++        unsafe {
++            libc::write(fd, &b as *const u8 as *const libc::c_void, 1);
++        }
++    }
++}
++
++/// Install the SIGINFO/SIGUSR2 handlers. Idempotent; returns false (and
++/// leaves SIGINFO_PIPE_W at -1) if anything fails - telemetry is strictly
++/// optional, a failed install must not fail the mount.
++fn install_signal_handlers() -> bool {
++    let mut fds = [0 as libc::c_int; 2];
++    // O_NONBLOCK: the handler's write must never block; CLOEXEC: nothing
++    // exec'd after this point wants the pipe (the mount helper ran before
++    // the thread was spawned).
++    if unsafe { libc::pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC) } != 0 {
++        return false;
++    }
++    SIGINFO_PIPE_R.store(fds[0], Ordering::SeqCst);
++    SIGINFO_PIPE_W.store(fds[1], Ordering::SeqCst);
++
++    let mut act: libc::sigaction = unsafe { std::mem::zeroed() };
++    act.sa_sigaction = siginfo_handler as libc::sighandler_t;
++    unsafe { libc::sigemptyset(&mut act.sa_mask) };
++    // SA_RESTART: the dump must not knock a worker thread's preadv(2) or
++    // futex wait out with EINTR - that's a wedge shape of its own.
++    act.sa_flags = libc::SA_RESTART;
++
++    let mut ok = true;
++    // sighandler_t's type differs by platform only in spelling; both arms
++    // assign the same extern "C" fn(c_int).
++    #[cfg(target_os = "freebsd")]
++    if unsafe { libc::sigaction(libc::SIGINFO, &act, std::ptr::null_mut()) } != 0 {
++        ok = false;
++    }
++    if unsafe { libc::sigaction(libc::SIGUSR2, &act, std::ptr::null_mut()) } != 0 {
++        ok = false;
++    }
++    if !ok {
++        // Leave the fds installed but unwired: the handlers may still have
++        // been half-installed, and the pipe is harmless either way.
++        SIGINFO_PIPE_W.store(-1, Ordering::SeqCst);
++    }
++    ok
++}
++
++/// A live bch_fs the telemetry thread reads, as a raw pointer.
++///
++/// SAFETY (the thread's contract): the pointer is valid from spawn() until
++/// Handle::stop() joins the thread, and stop() runs before the filesystem
++/// is shut down - in destroy(), before fs is taken, and in BcachefsFs's
++/// Drop for the paths destroy() never reaches. Fs is Sync (see fs/init/
++/// fs.rs), so sharing it across threads is as sound as the C underneath.
++struct FsRaw(*mut Fs);
++unsafe impl Send for FsRaw {}
++
++/// The telemetry thread's stop switch and join handle. stop() is idempotent
++/// and safe from destroy(), Drop, or anywhere else.
++pub struct Handle {
++    stop: Arc<AtomicBool>,
++    join: Option<JoinHandle<()>>,
++}
++
++impl Handle {
++    /// Stop the thread and wait for it. First caller flips the flag and
++    /// wakes the thread through the pipe; the join is bounded by the
++    /// thread's 1s poll, and a panic in the thread is reported, not
++    /// propagated - unmount must go through.
++    pub fn stop(&mut self) {
++        if !self.stop.swap(true, Ordering::SeqCst) {
++            let fd = SIGINFO_PIPE_W.load(Ordering::SeqCst);
++            if fd >= 0 {
++                let b: u8 = 1;
++                unsafe {
++                    libc::write(fd, &b as *const u8 as *const libc::c_void, 1);
++                }
++            }
++        }
++        if let Some(join) = self.join.take() {
++            if join.join().is_err() {
++                eprintln!("bcachefs fuse: telemetry thread panicked; ignoring");
++            }
++        }
++    }
++}
++
++/// A Handle for a thread that isn't running (failed spawn, failed signal
++/// install): everything on it is a no-op.
++fn inert_handle() -> Handle {
++    Handle { stop: Arc::new(AtomicBool::new(true)), join: None }
++}
++
++/// Spawn the telemetry thread for @fs. @mountpoint and @devs are labels for
++/// the dump (the devices the fs was opened from). Failure at any point
++/// returns a Handle that is already stopped - the mount proceeds without
++/// telemetry.
++pub fn spawn(fs: &Fs, mountpoint: &str, devs: &[std::path::PathBuf]) -> Handle {
++    if !install_signal_handlers() {
++        eprintln!("bcachefs fuse: telemetry: signal handler install failed; no SIGINFO dump");
++        return inert_handle();
++    }
++
++    let stop = Arc::new(AtomicBool::new(false));
++    let stop_thread = stop.clone();
++    let fs = FsRaw(fs.as_ptr());
++    let mountpoint = mountpoint.to_string();
++    let devs: Vec<String> = devs.iter().map(|d| d.display().to_string()).collect();
++
++    let rfd = SIGINFO_PIPE_R.load(Ordering::SeqCst);
++    if rfd < 0 {
++        return inert_handle();
++    }
++
++    let join = thread::Builder::new()
++        .name("bcachefs-telemetry".into())
++        .spawn(move || {
++            // Per-thread kernel runtime: current task + RCU registration,
++            // as the fuser workers do - mem_read()'s percpu walk and
++            // devs_rcu() need it.
++            ensure_thread_init();
++            run(fs, rfd, stop_thread, &mountpoint, &devs);
++        });
++    match join {
++        Ok(join) => Handle { stop, join: Some(join) },
++        Err(e) => {
++            eprintln!("bcachefs fuse: telemetry: thread spawn failed: {}", e);
++            inert_handle()
++        }
++    }
++}
++
++/// The thread: wait for signal-pipe bytes, dump, repeat until stopped.
++fn run(fs: FsRaw, rfd: libc::c_int, stop: Arc<AtomicBool>, mountpoint: &str, devs: &[String]) {
++    // SAFETY: the Handle joins this thread before the fs goes away - see
++    // FsRaw. Reborrowed per iteration so no &Fs is held anywhere it could
++    // outlive the join.
++    let fs: &Fs = unsafe { Fs::borrow_raw(fs.0.cast()) };
++
++    let mut polls = [libc::pollfd { fd: rfd, events: libc::POLLIN, revents: 0 }];
++    loop {
++        // Wake at most a second late for the stop flag.
++        let n = unsafe { libc::poll(polls.as_mut_ptr(), 1, 1000) };
++        if stop.load(Ordering::SeqCst) {
++            break;
++        }
++        if n > 0 && polls[0].revents & libc::POLLIN != 0 {
++            drain(rfd);
++            dump(fs, mountpoint, devs);
++        }
++    }
++}
++
++/// Empty the pipe: many pending SIGINFOs are one dump.
++fn drain(rfd: libc::c_int) {
++    let mut buf = [0u8; 64];
++    loop {
++        let n = unsafe { libc::read(rfd, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
++        if n <= 0 {
++            // 0 impossible for a pipe with the write end open; -1 is
++            // EAGAIN (drained) or EINTR (treat as drained - the next
++            // signal re-fills the pipe).
++            break;
++        }
++    }
++}
++
++/// The reconcile accounting types, in BCH_RECONCILE_ACCOUNTING order (the
++/// xmacro in fs/data/reconcile/format.rs); the dump's short names.
++const RECONCILE_TYPES: [(&str, u32); 8] = [
++    ("rep", 0), ("chk", 1), ("ec", 2), ("cmp", 3),
++    ("tgt", 4), ("hipri", 5), ("pend", 6), ("str", 7),
++];
++
++/// The data types, in BCH_DATA_TYPES order (fs/alloc/accounting_format.rs).
++const DATA_TYPES: [&str; 12] = [
++    "free", "sb", "journal", "btree", "user", "cached",
++    "parity", "stripe", "gc_gens", "discard", "unstriped", "multiple",
++];
++
++/// One accounting entry, as the dump and the phase 1 snapshot share it:
++/// a printable key and up to three counters.
++struct Entry {
++    key: String,
++    counters: [u64; 3],
++}
++
++/// Read every statically enumerable accounting position: one pass, all
++/// external (mem_read) - no locks. Positions that aren't enumerable without
++/// the accounting table (per-replicas-entry, per-inum, per-snapshot) are
++/// skipped on purpose: reading them needs mark_lock (see the module comment).
++fn collect_entries(fs: &Fs) -> Vec<Entry> {
++    let mut out = Vec::new();
++
++    // reconcile_work: two counters each (work items, sectors).
++    for &(name, ty) in RECONCILE_TYPES.iter() {
++        let pos = c::disk_accounting_pos::from_arm(c::bch_acct_reconcile_work { type_: ty as u8 });
++        let mut v = [0u64; 3];
++        accounting::mem_read(fs, &pos, &mut v);
++        out.push(Entry { key: format!("rw_{}", name), counters: v });
++    }
++
++    // dev_leaving per online device: sectors reconcile still has to move.
++    {
++        let rcu = rcu::read_lock();
++        let devs: Vec<u32> = fs.devs_rcu(&rcu).map(|ca| u32::from(ca.dev_idx)).collect();
++        drop(rcu);
++        for dev in devs {
++            let pos = c::disk_accounting_pos::from_arm(c::bch_acct_dev_leaving { dev });
++            let mut v = [0u64; 3];
++            accounting::mem_read(fs, &pos, &mut v);
++            out.push(Entry { key: format!("leaving_dev{}", dev), counters: v });
++        }
++    }
++
++    // per-(dev, data type) buckets/sectors/fragmentation - the closest
++    // external equivalent of the replicas breakdown.
++    {
++        let rcu = rcu::read_lock();
++        let devs: Vec<u32> = fs.devs_rcu(&rcu).map(|ca| u32::from(ca.dev_idx)).collect();
++        drop(rcu);
++        for dev in devs {
++            for (dt, name) in DATA_TYPES.iter().enumerate() {
++                let pos = c::disk_accounting_pos::from_arm(
++                    c::bch_acct_dev_data_type { dev: dev as u8, data_type: dt as u8 });
++                let mut v = [0u64; 3];
++                accounting::mem_read(fs, &pos, &mut v);
++                if v != [0, 0, 0] {
++                    out.push(Entry { key: format!("dd_dev{}_{}", dev, name), counters: v });
++                }
++            }
++        }
++    }
++
++    // persistent_reserved per replica count; rebalance_work; nr_inodes.
++    for nr in 1..=c::BCH_REPLICAS_MAX as u8 {
++        let pos = c::disk_accounting_pos::from_arm(c::bch_acct_persistent_reserved { nr_replicas: nr });
++        let mut v = [0u64; 3];
++        accounting::mem_read(fs, &pos, &mut v);
++        if v != [0, 0, 0] {
++            out.push(Entry { key: format!("presv_{}", nr), counters: v });
++        }
++    }
++    {
++        let pos = c::disk_accounting_pos::from_arm(c::bch_acct_rebalance_work {});
++        let mut v = [0u64; 3];
++        accounting::mem_read(fs, &pos, &mut v);
++        out.push(Entry { key: "rebalance".to_string(), counters: v });
++    }
++    {
++        let pos = c::disk_accounting_pos::from_arm(c::bch_acct_nr_inodes {});
++        let mut v = [0u64; 3];
++        accounting::mem_read(fs, &pos, &mut v);
++        out.push(Entry { key: "nr_inodes".to_string(), counters: v });
++    }
++
++    // btree per id, summed: sectors, nodes, non-leaves.
++    {
++        let mut sum = [0u64; 3];
++        for btree in bcachefs_kernel::BTREE_IDS_KNOWN.iter() {
++            let pos = c::disk_accounting_pos::from_arm(c::bch_acct_btree { id: btree.0 });
++            let mut v = [0u64; 3];
++            accounting::mem_read(fs, &pos, &mut v);
++            for (s, x) in sum.iter_mut().zip(v.iter()) {
++                *s = s.wrapping_add(*x);
++            }
++        }
++        out.push(Entry { key: "btree_total".to_string(), counters: sum });
++    }
++
++    // compression per type, summed: extents, uncompressed, compressed.
++    {
++        let mut sum = [0u64; 3];
++        let nr = c::bch_compression_type::BCH_COMPRESSION_TYPE_NR.0;
++        for ty in 0..nr {
++            let pos = c::disk_accounting_pos::from_arm(c::bch_acct_compression { type_: ty as u8 });
++            let mut v = [0u64; 3];
++            accounting::mem_read(fs, &pos, &mut v);
++            for (s, x) in sum.iter_mut().zip(v.iter()) {
++                *s = s.wrapping_add(*x);
++            }
++        }
++        out.push(Entry { key: "compression_total".to_string(), counters: sum });
++    }
++
++    out
++}
++
++/// The SIGINFO dump: one summary line of the interesting accounting, then
++/// the nonzero persistent counters; at most 64 lines in all.
++fn dump(fs: &Fs, mountpoint: &str, devs: &[String]) {
++    // One-line summary: the P4 phase 0 gate question is whether
++    // reconcile_work is live at all under production load.
++    let entries = collect_entries(fs);
++    let mut line = format!(
++        "bcachefs-fuse[{}] {} dev[{}] SIGINFO:",
++        std::process::id(),
++        mountpoint,
++        devs.join(":")
++    );
++    for e in entries.iter() {
++        line.push(' ');
++        line.push_str(&e.key);
++        line.push('=');
++        // three counters or fewer, /-separated, trailing zeros kept off
++        let n = e.counters.iter().rposition(|&x| x != 0).map_or(1, |i| i + 1);
++        for (i, v) in e.counters.iter().take(n).enumerate() {
++            if i > 0 {
++                line.push('/');
++            }
++            line.push_str(&v.to_string());
++        }
++    }
++    eprintln!("{}", line);
++
++    // Counters: nonzero ones only, wrapped at a few per line, bounded.
++    let mut printed = 1;
++    'outer: for chunk in (0..c::BCH_COUNTER_NR as usize).step_by(6) {
++        let mut cline = String::from("bcachefs-fuse counters:");
++        let mut any = false;
++        for i in chunk..(chunk + 6).min(c::BCH_COUNTER_NR as usize) {
++            let v = fs.counter_read(i);
++            if v != 0 {
++                cline.push_str(&format!(" c{}={}", i, v));
++                any = true;
++            }
++        }
++        if any {
++            eprintln!("{}", cline);
++            printed += 1;
++            if printed >= 64 {
++                break 'outer;
++            }
++        }
++    }
++}
+--- a/src/commands/fusemount.rs
++++ b/src/commands/fusemount.rs
+@@ -72,6 +72,8 @@
+ 
+ use crate::util::AlignedBuf;
+ 
++mod telemetry;
++
+ // XATTR_REPLACE: the flag word passed to rust_fuse_xattr_set() below and
+ // interpreted by bch2_xattr_set() is the Linux xattr(2) ABI (uapi/linux/
+ // xattr.h). The libc crate exports it only for linux_like targets, so on
+@@ -881,8 +883,23 @@
+     /// let go in destroy(), with the filesystem shut down, so they're free by
+     /// the time umount returns - not when the process gets round to exiting.
+     held: Vec<File>,
++    /// The telemetry thread (SIGINFO dump; P4 phase 0): stopped before the
++    /// filesystem is shut down - it reads the live bch_fs, so it must be
++    /// joined before fs goes away. See telemetry.rs.
++    telemetry: telemetry::Handle,
+ }
+ 
++impl Drop for BcachefsFs {
++    fn drop(&mut self) {
++        // The paths destroy() never reaches - a mount that failed before
++        // fuser took us over still drops the filesystem (OpenFs's Drop),
++        // and the telemetry thread must not outlive that. destroy() has
++        // already stopped it by the time the holder drops us; stop() is
++        // idempotent.
++        self.telemetry.stop();
++    }
++}
++
+ // Safety: bch_fs is internally synchronized with its own locking.
+ unsafe impl Send for BcachefsFs {}
+ unsafe impl Sync for BcachefsFs {}
+@@ -1042,6 +1059,11 @@
+     fn destroy(&mut self) {
+         eprintln!("bcachefs fuse: destroy");
+         ensure_thread_init();
++
++        // First: the telemetry thread reads the live filesystem through a
++        // raw pointer - join it before fs is taken below shuts that
++        // filesystem down (bch2_fs_exit).
++        self.telemetry.stop();
+ 
+         let referenced = self.nodes.lock().unwrap().drain();
+         for inum in referenced {
+@@ -2480,12 +2502,14 @@
+             }
+             anyhow::bail!("Error starting filesystem: {}", e);
+         }
++        let telemetry = telemetry::spawn(&fs, &cli.mountpoint, &devs);
+         let bcachefs_fs = BcachefsFs {
+             fs: Some(fs),
+             signal_fd: None,
+             nodes: Mutex::new(NodeMap::new()),
+             atime: AtimeOpts::from_ms_flags(ms_flags),
+             held,
++            telemetry,
+         };
+         if let Err(e) = fuse_serve(bcachefs_fs, &cli.mountpoint, &config, fd) {
+             anyhow::bail!("Error mounting filesystem: {}", e);
+@@ -2631,12 +2655,17 @@
+             std::process::exit(1);
+         }
+     };
++    // After the fork, in the daemon: safe to spawn threads. The telemetry
++    // thread is joined in destroy() / BcachefsFs's Drop, before the
++    // filesystem is shut down.
++    let telemetry = telemetry::spawn(&fs, &cli.mountpoint, &devs);
+     let bcachefs_fs = BcachefsFs {
+         fs: Some(fs),
+         signal_fd: Some(signal_fd),
+         nodes: Mutex::new(NodeMap::new()),
+         atime: AtimeOpts::from_ms_flags(ms_flags),
+         held,
++        telemetry,
+     };
+ 
+     match fuse_serve(bcachefs_fs, &cli.mountpoint, &config, fuse_fd) {

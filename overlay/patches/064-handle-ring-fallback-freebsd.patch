@@ -1,0 +1,202 @@
+--- a/src/wrappers/handle.rs
++++ b/src/wrappers/handle.rs
+@@ -56,20 +56,87 @@
+ 
+ const SYSFS_BASE: &str = "/sys/fs/bcachefs/";
+ 
++/// The FreeBSD daemon's snapshot ring (fusemount telemetry): one dir per
++/// mounted filesystem, named by uuid, holding accounting.json.
++#[cfg(target_os = "freebsd")]
++const RING_BASE: &str = "/var/run/bcachefs-fuse";
++
++/// Resolve the mounted bcachefs a path is on, from the snapshot ring:
++/// its uuid and the devices the daemon mounted it from. Gates on statfs
++/// fstype "fusefs.bcachefs" first (kernel-only, no FUSE traffic, and it
++/// spares the ring scan for plain paths); the ring's mountpoint field -
++/// what mount(8) was given - says which entry is ours, which is what
++/// catches a stale entry (dead daemon, mount since replaced). A ringless
++/// mount returns None and the caller carries on down its not-mounted
++/// paths.
++#[cfg(target_os = "freebsd")]
++fn snapshot_lookup(path: &Path) -> Option<([u8; 16], Vec<std::path::PathBuf>)> {
++    use std::os::unix::ffi::OsStrExt;
++
++    // fstype gate first: kernel-only, no FUSE traffic, and it spares the
++    // ring scan for every plain path.
++    let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
++    let mut st: libc::statfs = unsafe { std::mem::zeroed() };
++    if unsafe { libc::statfs(c_path.as_ptr(), &mut st) } != 0 {
++        return None;
++    }
++    let fstype: String = {
++        let buf: Vec<u8> = st.f_fstypename.iter().map(|&ch| ch as u8).collect();
++        let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
++        String::from_utf8_lossy(&buf[..end]).into_owned()
++    };
++    if fstype != "fusefs.bcachefs" {
++        return None;
++    }
++
++    let ours = path.canonicalize().ok()?;
++
++    let dir = std::fs::read_dir(RING_BASE).ok()?;
++    for entry in dir.flatten() {
++        let text = match std::fs::read_to_string(entry.path().join("accounting.json")) {
++            Ok(t) => t,
++            Err(_) => continue,
++        };
++        let v: serde_json::Value = match serde_json::from_str(&text) {
++            Ok(v) => v,
++            Err(_) => continue,
++        };
++        let mountpoint = v.get("mountpoint").and_then(|m| m.as_str())
++            .and_then(|m| std::fs::canonicalize(m).ok());
++        if mountpoint.as_ref() != Some(&ours) {
++            continue;
++        }
++        let uuid_str = v.get("uuid").and_then(|u| u.as_str())?;
++        let uuid = parse_uuid(uuid_str).ok()?;
++        let devs = v.get("devices").and_then(|d| d.as_array())
++            .map(|arr| arr.iter()
++                .filter_map(|d| d.as_str().map(std::path::PathBuf::from))
++                .collect())
++            .unwrap_or_default();
++        return Some((uuid, devs));
++    }
++    None
++}
++
+ /// `struct fs_sysfs_path` (linux/fs.h). Defined here because the blocklist
+ /// keeps linux/fs.h's types out of the bindings. The ioctl number carrying its
+ /// size comes from the C compiler, so the assert is what stops the two drifting.
++/// FreeBSD takes the snapshot ring instead (see open_mounted_path), so none
++/// of this exists there.
++#[cfg(not(target_os = "freebsd"))]
+ #[repr(C)]
+ struct FsSysfsPath {
+     len: u8,
+     name: [u8; 128],
+ }
+ 
++#[cfg(not(target_os = "freebsd"))]
+ const _: () = assert!(
+     mem::size_of::<FsSysfsPath>() == bch_bindgen::c::BCH_SIZEOF_FS_SYSFS_PATH,
+     "FsSysfsPath must match struct fs_sysfs_path - FS_IOC_GETFSSYSFSPATH encodes its size",
+ );
+ 
++#[cfg(not(target_os = "freebsd"))]
+ const FS_IOC_GETFSSYSFSPATH: IoctlRequest =
+     bch_bindgen::c::BCH_FS_IOC_GETFSSYSFSPATH as IoctlRequest;
+ 
+@@ -163,6 +230,15 @@
+ 
+         if file_type == rustix::fs::FileType::RegularFile {
+             return Ok(None);
++        }
++
++        // FreeBSD: the FUSE daemon's ioctl is unimplemented, so
++        // BCH_IOCTL_QUERY_UUID can never answer. Recognize the mount by
++        // fstype instead (kernel-only, same gate as util::path_subvol) and
++        // resolve uuid + devices from the daemon's snapshot ring.
++        #[cfg(target_os = "freebsd")]
++        if let Some((uuid, _devs)) = snapshot_lookup(path) {
++            return Self::open_mounted_path(path_fd, uuid).map(Some);
+         }
+ 
+         // Try BCH_IOCTL_QUERY_UUID — if it succeeds, it's a mounted fs path
+@@ -208,36 +284,84 @@
+         Ok(None)
+     }
+ 
++
+     /// The mounted filesystem's member block device paths, from sysfs
+     /// (/sys/fs/bcachefs/<uuid>/dev-N/block). The paths a caller resolved
+     /// the filesystem BY (mount point, UUID) aren't openable as devices -
+     /// these are.
+     pub(crate) fn member_devices(&self) -> Result<Vec<std::path::PathBuf>, BchError> {
+-        let sysfs_path = sysfs::sysfs_path_from_fd(self.sysfs_fd())
+-            .map_err(|_| BchError::from_raw(-libc::EIO))?;
+-
+-        let mut devs = Vec::new();
+-        for d in sysfs::fs_get_devices(&sysfs_path, sysfs::DeviceNameMode::Raw)
+-                .map_err(|_| BchError::from_raw(-libc::EIO))? {
+-            if d.online {
+-                devs.push(std::path::PathBuf::from(format!("/dev/{}", d.dev)));
++        // FreeBSD: no sysfs behind that fd - the daemon's snapshot ring
++        // (fusemount telemetry, written every 60s) carries the device
++        // list it mounted the filesystem from.
++        #[cfg(target_os = "freebsd")]
++        {
++            let uuid = format_uuid(&self.uuid);
++            let path = std::path::Path::new(RING_BASE).join(uuid).join("accounting.json");
++            let text = std::fs::read_to_string(&path)
++                .map_err(|_| BchError::from_raw(-libc::EIO))?;
++            let v: serde_json::Value = serde_json::from_str(&text)
++                .map_err(|_| BchError::from_raw(-libc::EIO))?;
++            let devs = v.get("devices").and_then(|d| d.as_array())
++                .ok_or_else(|| BchError::from_raw(-libc::ENOENT))?;
++            let devs: Vec<std::path::PathBuf> = devs.iter()
++                .filter_map(|d| d.as_str().map(std::path::PathBuf::from))
++                .collect();
++            if devs.is_empty() {
++                return Err(BchError::from_raw(-libc::ENOENT));
+             }
++            return Ok(devs);
+         }
+ 
+-        if devs.is_empty() {
+-            return Err(BchError::from_raw(-libc::ENOENT));
++        #[cfg(not(target_os = "freebsd"))]
++        {
++            let sysfs_path = sysfs::sysfs_path_from_fd(self.sysfs_fd())
++                .map_err(|_| BchError::from_raw(-libc::EIO))?;
++
++            let mut devs = Vec::new();
++            for d in sysfs::fs_get_devices(&sysfs_path, sysfs::DeviceNameMode::Raw)
++                    .map_err(|_| BchError::from_raw(-libc::EIO))? {
++                if d.online {
++                    devs.push(std::path::PathBuf::from(format!("/dev/{}", d.dev)));
++                }
++            }
++
++            if devs.is_empty() {
++                return Err(BchError::from_raw(-libc::ENOENT));
++            }
++            Ok(devs)
+         }
+-        Ok(devs)
+     }
+ 
+     /// Open a mounted filesystem path. The fd becomes the ioctl fd.
+     fn open_mounted_path(ioctl_fd: OwnedFd, uuid: [u8; 16]) -> Result<Self, BchError> {
++        // FreeBSD: no sysfs and no FS_IOC_GETFSSYSFSPATH - the sysfs fd is
++        // an inert /dev/null placeholder, and whatever would have come out
++        // of sysfs (the member device list) is answered from the daemon's
++        // snapshot ring by member_devices() below.
++        #[cfg(target_os = "freebsd")]
++        {
++            let sysfs_fd = rustix::fs::open(
++                "/dev/null",
++                rustix::fs::OFlags::RDONLY,
++                rustix::fs::Mode::empty(),
++            ).map_err(|e| BchError::from_raw(-e.raw_os_error()))?;
++            return Ok(BcachefsHandle {
++                ioctl_fd,
++                sysfs_fd,
++                uuid,
++                dev_idx: -1,
++            });
++        }
++
+         // Try FS_IOC_GETFSSYSFSPATH to get sysfs path
++        #[cfg(not(target_os = "freebsd"))]
+         let mut fs_path = FsSysfsPath { len: 0, name: [0; 128] };
++        #[cfg(not(target_os = "freebsd"))]
+         let ret = unsafe {
+             libc::ioctl(ioctl_fd.as_raw_fd(), FS_IOC_GETFSSYSFSPATH, &mut fs_path)
+         };
+ 
++        #[cfg(not(target_os = "freebsd"))]
+         let sysfs_fd = if ret == 0 {
+             let name_len = fs_path.len as usize;
+             let name = std::str::from_utf8(&fs_path.name[..name_len])

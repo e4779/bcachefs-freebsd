@@ -1,0 +1,47 @@
+--- a/src/util.rs
++++ b/src/util.rs
+@@ -71,13 +71,39 @@
+ /// pair changes if and only if we cross into a different filesystem or a
+ /// different subvolume.
+ fn path_subvol(path: &Path) -> Option<(u64, u64)> {
+-    // STATX_SUBVOL is a bcachefs patch to Linux statx(2); FreeBSD has
+-    // neither the call nor the extension, so None is the honest answer —
+-    // callers already treat it as "not on a kernel-visible bcachefs".
++    // FreeBSD has no statx(2); the FUSE port's mounts are the thing to
++    // recognize, and the kernel names them: the daemon mounts with
++    // subtype=bcachefs (parse_fuse_mount_options()), which comes out as
++    // f_fstypename "fusefs.bcachefs" — verified on the live mount:
++    //   % mount | grep fusefs
++    //   /dev/nda0p3:/dev/ada1 on /mnt/pool (fusefs.bcachefs)
++    // statfs(2) is kernel-only — no FUSE round-trip, nothing wakes the
++    // daemon. Subvolume granularity is beyond statfs, so the root
++    // subvolume (1) is the answer; the pair still changes at exactly the
++    // mount root, which is the boundary subvol_root() walks up to.
+     #[cfg(target_os = "freebsd")]
+     {
+-        let _ = path;
+-        None
++        use std::os::unix::ffi::OsStrExt;
++        use std::os::unix::fs::MetadataExt;
++
++        let c_path = CString::new(path.as_os_str().as_bytes()).ok()?;
++        let mut st: libc::statfs = unsafe { std::mem::zeroed() };
++        if unsafe { libc::statfs(c_path.as_ptr(), &mut st) } != 0 {
++            return None;
++        }
++        // statfs(3) string fields are [c_char; N]: collect the byte view,
++        // cut at the NUL, convert lossily — the same dance as
++        // fuse_mounted() in fusemount.rs.
++        let fstype = {
++            let buf: Vec<u8> = st.f_fstypename.iter().map(|&ch| ch as u8).collect();
++            let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
++            String::from_utf8_lossy(&buf[..end]).into_owned()
++        };
++        if fstype != "fusefs.bcachefs" {
++            return None;
++        }
++        let dev = std::fs::metadata(path).ok()?.dev();
++        Some((dev, 1))
+     }
+     #[cfg(target_os = "linux")]
+     {
