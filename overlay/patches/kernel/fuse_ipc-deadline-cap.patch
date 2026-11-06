@@ -1,0 +1,35 @@
+--- a/sys/fs/fuse/fuse_ipc.c	2026-11-06 11:11:48.560531000 +0700
++++ b/sys/fs/fuse/fuse_ipc.c	2026-11-06 11:11:48.566433000 +0700
+@@ -411,6 +411,9 @@
+ 	int err = 0, stops_deferred;
+ 	struct fuse_data *data = ftick->tk_data;
+ 	bool interrupted = false;
++	int deadline, slptime;
++
++	deadline = ticks + data->daemon_timeout * hz;
+ 
+ 	if (fsess_maybe_impl(ftick->tk_data->mp, FUSE_INTERRUPT) &&
+ 	    data->dataflags & FSESS_INTR) {
+@@ -435,8 +438,20 @@
+ 		goto out;
+ 	}
+ 	kern_sigprocmask(td, SIG_BLOCK, &blockedset, NULL, 0);
+-	err = msleep(ftick, &ftick->tk_aw_mtx, PCATCH, "fu_ans",
+-	    data->daemon_timeout * hz);
++	/*
++	 * Cap the total wait at one daemon_timeout window from entry:
++	 * periodic signals restart the msleep with a fresh window each
++	 * time (EINTR path below), which can extend the wait indefinitely.
++	 * Observed with qbittorrent: a signaled thread never sees
++	 * ETIMEDOUT and stays wedged in fdisp_wait_answ forever
++	 * (bcachefs FUSE dogfood, 2026-11).
++	 */
++	slptime = deadline - ticks;
++	if (slptime <= 0)
++		err = EWOULDBLOCK;
++	else
++		err = msleep(ftick, &ftick->tk_aw_mtx, PCATCH, "fu_ans",
++		    slptime);
+ 	kern_sigprocmask(td, SIG_SETMASK, &oldset, NULL, 0);
+ 	if (err == EWOULDBLOCK) {
+ 		SDT_PROBE2(fusefs, , ipc, trace, 3,
