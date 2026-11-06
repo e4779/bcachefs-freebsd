@@ -22,7 +22,8 @@
 ** WAITING P1: reply-path hardening + deadline-слой одной работой :port:
 Сборка идёт: fuser-vendored (writev bounded retry 5×10ms, EAGAIN/EWOULDBLOCK/EINTR/ENOMEM) + Cargo.toml path-dep. Deadline-слой (watchdog/heartbeat) — после оценки эффекта retry на живом.
 C+B: destroy-before-reply семантика (fuser#757, форк koverstreet) + writev-retry + reply-registry/watchdog/reader-heartbeat. Сверить escape-коды с fuse_io.c. Это root-cause фикс Shape-1.
-** NEXT P2: f3-heal.sh супервизор задеплоен, sunset 2 недели :ops:
+** WAITING P2: f3-heal.sh супервизор на посту; qbt остановлен на ночь :ops:
+2026-11-06 вечер: qbt — единственный стабильный триггер livelock (init-бёрст); остановлен до atomic-фикса, enable=NO в rc.conf. Восстановить: qbittorrent_enable=YES + onestart. Троица stash/amut/amuled служит.
 Триггеры: демон мёртв ИЛИ wedge >5 мин -> полный bounce стека (включая qbt — с retry-фиксом бёрст-триггер должен уйти; если флапает — sunset-пересмотр).
 Только mount -u timeout=30 -> supervised рестарт ДЕМОНА (не клиентов! рестарт qbt = 3/3 триггер). Sunset 2 недели без wedge. Тройка приёмки: KPI + expiry + письменно предзаписанный rollback-триггер.
 ** TODO P3: поименованный мьютекс-фикс, staggered fastresume qbt, Ф4-дрели :port:soak:
@@ -40,7 +41,7 @@ fusemount.rs:2340-2375 сверяет f_mntfromname с одиночным пут
 Доказанный механизм wedge: fdisp_wait_answ таймаутит (60с) → fuse_io_strategy редиртит буфер (fuse_io.c:896-902) + biobackend goto again (:602-607) → вечный цикл, очередь ms_head растёт. Триггер в демоне: event-loop застревает в umtx (инцидент #1: ни один поток в read(/dev/fuse)). Инструмент: скрипт-сторож (стеки демона через procstat -kk при обнаружении потока клиента в fdisp_wait_answ >N мин + sndump/поиск владельца мьютекса), деплой в scripts/.
 ** CANCELLED Демон-дедлок (отдельная задача): поглощена P0/P1 совета
 :PROPERTIES:
-:BLOCKER: id:wedge-catcher
+:BLOCKER: id:2a93749a-d986-11f1-a363-9c6b00bdbaa5
 :END:
 Поглощено P0 (поимка) + P1 (фикс) — совет 2026-11-06.
 ** TODO amuled: вернуть svcj после стабилизации :svcj:
