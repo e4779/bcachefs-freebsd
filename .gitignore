@@ -3,3 +3,5 @@ tools/
 *.log
 tmp/
 docs/evidence/**/daemon-truss.txt
+docs/evidence/*/bcachefs.core
+docs/evidence/**/*.core
