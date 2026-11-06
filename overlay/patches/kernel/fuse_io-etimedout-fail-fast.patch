@@ -1,0 +1,38 @@
+--- /root/fuse_io.c.orig-backup	2026-11-06 10:42:51.370140000 +0700
++++ /usr/src/sys/fs/fuse/fuse_io.c	2026-11-06 10:43:26.492341000 +0700
+@@ -893,14 +893,32 @@
+ 			error = fuse_write_directbackend(vp, uiop, cred, fufh,
+ 				filesize, 0, pages);
+ 
+-			if (error == EINTR || error == ETIMEDOUT) {
++			if (error == EINTR) {
+ 				bp->b_flags &= ~(B_INVAL | B_NOCACHE);
+ 				if ((bp->b_flags & B_PAGING) == 0) {
+ 					bdirty(bp);
+ 					bp->b_flags &= ~B_DONE;
+ 				}
+-				if ((error == EINTR || error == ETIMEDOUT) &&
+-				    (bp->b_flags & B_ASYNC) == 0)
++				if ((bp->b_flags & B_ASYNC) == 0)
++					bp->b_flags |= B_EINTR;
++			} else if (error == ETIMEDOUT) {
++				/*
++				 * Daemon unresponsive for a full timeout window.
++				 * Fail back to the client instead of redirtying and
++				 * trusting the buf daemon to re-drive: observed
++				 * (bcachefs FUSE, 2026-11) a redirtied buffer may
++				 * never complete, wedging the client forever.  Keep
++				 * the dirty data (no B_INVAL) so later writes retry;
++				 * the caller sees ETIMEDOUT and retries itself.
++				 */
++				bp->b_flags &= ~(B_INVAL | B_NOCACHE);
++				if ((bp->b_flags & B_PAGING) == 0) {
++					bdirty(bp);
++					bp->b_flags &= ~B_DONE;
++				}
++				bp->b_ioflags |= BIO_ERROR;
++				bp->b_error = ETIMEDOUT;
++				if ((bp->b_flags & B_ASYNC) == 0)
+ 					bp->b_flags |= B_EINTR;
+ 			} else {
+ 				if (error) {
