@@ -16,10 +16,10 @@
 - Рычаг mount -u -o timeout=30: ПРОВЕРЕН вживую, rc=0 (совет считал EOPNOTSUPP — на этом ядре работает; эффект по циклам wedge уточнить).
 Вердикт по вопросу владельца: ~70% day-1 инфры легитимно (охота), дрейф в 4 маркерах: ослепление монитора на qbt, рычаг, отсутствие тройки приёмки (KPI/expiry/rollback-триггер), остывающий репро 3/3.
 
-** DONE P0: root-cause найден — core-дамп вскрыт lldb :wedge:
-Цепочка (lldb core, поток fuser-0): FUSE read(ino 2147514231) -> __bch2_read_extent -> bch2_bucket_io_time_reset(dev 0, bucket 244817) -> btree-trans commit -> six_unlock_write -> six_unlock_ip -> atomic_sub_return_release(SIX_LOCK_write) -> LIVELOCK в atomic.h:298 (ATOMIC64_SPINLOCK FreeBSD-шим). Reader мёртв => FS замерла => тикеты 60с умирают => вечный redirty. Триггер: контенция при мульти-клиентском бёрсте. НЕ fuser/writev/nodes-Mutex (writev-retry дал 0 событий; class-3 отвергнут).
+** DONE P0: root-cause найден и УТОЧНЁН утром 2026-11-07 — семантика спина, не атомики :wedge:
+Финальная цепочка (lldb core + чтение исходников утром): FUSE read -> btree ops -> six_unlock -> six_lock_wakeup -> guard(raw_spinlock)(&lock->wait_lock), а raw_spinlock в порте = НЕ-РЕКУРСИВНЫЙ pthread_mutex = СПИТ. Держатель wait_lock спит -> fuser-0 блокируется навсегда на мьютексе (вчерашняя теория 'atomic64-бакеты' ошибочна: ATOMIC64_SPINLOCK нигде не определён, атомики нативные lock-free; PC-атрибуция по оптимизированному inline размывала кадр). ФИКС: spinlock_types.h -> pthread_spin (семантика ядра: под spinlock не спят; циркулярные sleep-ожидания исчезают классом). Оверлей: overlay/files/include/linux/spinlock_types.h.
 Уроки: catcher-v2 truss УБИВАЛ демона SIGTRAP при detach (signal 5, core dumped — случайно дало лучший артефакт); v3 без truss; core-дамп через kill -5 = легитимный инструмент (с остановкой heal).
-** WAITING P1: reply-path hardening + deadline-слой одной работой :port:
+** NEXT P1-продолжение: spin-fix НЕ вылечил wedge (acid test 2026-11-07: qbt init — 1 wedged поток, readers:0). Шесть имеет ещё локи (wait_fifo, bitwait) или фикс не в пути сборки. Следующий шаг: kill -5 демона на НОВОМ билде при wedge -> свежий core -> lldb -> точный кадр. :port:
 Сборка идёт: fuser-vendored (writev bounded retry 5×10ms, EAGAIN/EWOULDBLOCK/EINTR/ENOMEM) + Cargo.toml path-dep. Deadline-слой (watchdog/heartbeat) — после оценки эффекта retry на живом.
 C+B: destroy-before-reply семантика (fuser#757, форк koverstreet) + writev-retry + reply-registry/watchdog/reader-heartbeat. Сверить escape-коды с fuse_io.c. Это root-cause фикс Shape-1.
 ** WAITING P2: f3-heal.sh супервизор на посту; qbt остановлен на ночь :ops:
