@@ -22,6 +22,7 @@ load_rc_config "$name"
 : ${poolfuse_tools:="/home/e4779/projects/bcachefs-freebsd"}
 : ${poolfuse_cap_mb:=8000}
 : ${poolfuse_wait_s:=90}
+: ${poolfuse_timeout_s:=300}
 : ${poolfuse_fuse_log:=}
 
 start_cmd="poolfuse_start"
@@ -33,7 +34,7 @@ poolfuse_mount_attempt()
         cd "$poolfuse_tools" || exit 1
         [ -n "$poolfuse_fuse_log" ] && export BCACHEFS_FUSE_LOG=$poolfuse_fuse_log
         ./scripts/rlimit-run.sh "$poolfuse_cap_mb" ./tools/bcachefs mount \
-            -o fuse,allow_other \
+            -o fuse,allow_other,timeout="$poolfuse_timeout_s" \
             "$poolfuse_dev_nvme:$poolfuse_dev_hdd" "$poolfuse_mountpoint"
     ) >>/var/log/poolfuse-start.log 2>&1 &
 }
@@ -42,7 +43,7 @@ poolfuse_wait()
 {
     i=0
     while [ $i -lt $poolfuse_wait_s ]; do
-        if mount | grep -q " ${poolfuse_mountpoint} "; then
+        if mount | grep -q " $poolfuse_mountpoint "; then
             return 0
         fi
         sleep 1
@@ -53,7 +54,7 @@ poolfuse_wait()
 
 poolfuse_start()
 {
-    if mount | grep -q " ${poolfuse_mountpoint} "; then
+    if mount | grep -q " $poolfuse_mountpoint "; then
         echo "${name}: already mounted"
         return 0
     fi
@@ -64,7 +65,7 @@ poolfuse_start()
         return 1
     fi
     [ -c "$poolfuse_dev_nvme" ] || { echo "${name}: $poolfuse_dev_nvme missing"; return 1; }
-    echo "Mounting bcachefs pool (cap ${poolfuse_cap_mb}MB)"
+    echo "Mounting bcachefs pool (cap ${poolfuse_cap_mb}MB, timeout ${poolfuse_timeout_s}s)"
     poolfuse_mount_attempt
     n=0
     while [ $n -lt 3 ]; do
@@ -77,13 +78,13 @@ poolfuse_start()
         sleep 2
         poolfuse_mount_attempt
     done
-    echo "${name}: mount did not appear in $((poolfuse_wait_s * 2))s"
+    echo "${name}: mount did not appear in $((poolfuse_wait_s * 3))s"
     return 1
 }
 
 poolfuse_stop()
 {
-    if ! mount | grep -q " ${poolfuse_mountpoint} "; then
+    if ! mount | grep -q " $poolfuse_mountpoint "; then
         echo "${name}: not mounted"
         return 0
     fi
