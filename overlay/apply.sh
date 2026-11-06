@@ -5,7 +5,22 @@
 # stamps are the primary skip mechanism. Fresh clone = full forward chain.
 set -e
 root="$(cd "$(dirname "$0")/.." && pwd)"
-[ -f "$root/tools/Makefile" ] || { echo "overlay/apply.sh: $root/tools/Makefile not found (clone first)" >&2; exit 1; }
+# Bootstrap: clone the pinned upstream if tools/ is absent (see overlay/README.md).
+BCACHEFS_TOOLS_URL=https://github.com/koverstreet/bcachefs-tools.git
+BCACHEFS_TOOLS_REF=d48ba1a7a1d03afed5a20d1cce8189e9ae9a8486
+if [ ! -f "$root/tools/Makefile" ]; then
+	if command -v git >/dev/null 2>&1; then
+		echo "overlay/apply.sh: tools/ missing - cloning upstream at $BCACHEFS_TOOLS_REF"
+		git clone "$BCACHEFS_TOOLS_URL" "$root/tools" || exit 1
+		git -C "$root/tools" checkout "$BCACHEFS_TOOLS_REF" || {
+			echo "overlay/apply.sh: pinned ref $BCACHEFS_TOOLS_REF not found - update the pin (see overlay/README.md)" >&2
+			exit 1
+		}
+	else
+		echo "overlay/apply.sh: $root/tools/Makefile not found and git(1) unavailable to clone" >&2
+		exit 1
+	fi
+fi
 
 # 1. files: copy overlay/files/** into tools/, overwriting (deterministic).
 ( cd "$root/overlay/files" && find . -type f | while read -r f; do
