@@ -6,6 +6,27 @@
 
 Текучка: демон rctl 8G (rule на pid), монитор /tmp/f3-monitor.sh (пересоздаётся после ребута — скрипт в tmp/), heartbeat tmp/f3-heartbeat.log. Rescue-рычаг при wedge: mount -u -o timeout=N /mnt/pool (переводит вечный redirty-цикл в фейлящиеся записи; fuse_vfsops.c:237 update path).
 
+
+* Council 2026-11-06: архитектурное решение по wedge (5 мест + синтез)
+Ключевые открытия сверх вводной:
+- Детерминированный qbt-wedge = CLOSE-путь (fuse_filehandle_close -> fdisp_wait_answ), не write: 711 fastresume = шторм close/release/forget. Kit 092614.
+- Чистый kit: НИ ОДИН поток демона не читает /dev/fuse — single-reader луп мёртв в umtx (глобальный сталл). Подозреваемые: forget-guard fusemount.rs:901, nodes-Mutex :878.
+- «Демон служит (stash 200)» возможно иллюзия кэша (TTL=Duration::MAX) — дискриминатор: cache-busting канарейка.
+- Модель: Shape-1 (детерминированный, close-шторм -> reply-path failure -> брошенный мьютекс -> смерть ридера) / Shape-2 (транзиентный, worker за пер-инодовым локом) / Class-3 (reply на мёртвый unique дропается молча).
+- Рычаг mount -u -o timeout=30: ПРОВЕРЕН вживую, rc=0 (совет считал EOPNOTSUPP — на этом ядре работает; эффект по циклам wedge уточнить).
+Вердикт по вопросу владельца: ~70% day-1 инфры легитимно (охота), дрейф в 4 маркерах: ослепление монитора на qbt, рычаг, отсутствие тройки приёмки (KPI/expiry/rollback-триггер), остывающий репро 3/3.
+
+** NEXT P0: catcher v2 — umtx-адреса через truss/dtrace + майнинг 3 китов :wedge:
+Подтвердить механику reply-path failure -> брошенный мьютекс -> смерть single-reader. Главные подозреваемые: forget-guard fusemount.rs:901, nodes-Mutex :878, writev-error -> error!() (reply.rs:121).
+** NEXT P1: reply-path hardening + deadline-слой одной работой :port:
+C+B: destroy-before-reply семантика (fuser#757, форк koverstreet) + writev-retry + reply-registry/watchdog/reader-heartbeat. Сверить escape-коды с fuse_io.c. Это root-cause фикс Shape-1.
+** TODO P2: E-lite автоматизация рычага с sunset :ops:
+Только mount -u timeout=30 -> supervised рестарт ДЕМОНА (не клиентов! рестарт qbt = 3/3 триггер). Sunset 2 недели без wedge. Тройка приёмки: KPI + expiry + письменно предзаписанный rollback-триггер.
+** TODO P3: поименованный мьютекс-фикс, staggered fastresume qbt, Ф4-дрели :port:soak:
+** CANCELLED D: ядерная политика fail-fast — отклонена советом (redirty by design = data safety)
+** WAITING F: break-glass откат на VM/NFS-мост — невозможен пока VM пересобирается; числовой триггер предзаписать
+** TODO Апстрим: киты -> fuser#29/#757 + koverstreet форк :upstream:
+
 * Задачи
 ** DONE Fix A: fuse_mounted multi-device false-negative :port:boot:
 fusemount.rs:2340-2375 сверяет f_mntfromname с одиночным путём девайса; на multi-device там склеенная строка /dev/nda0p3:/dev/ada1 => никогда true => здоровый маунт не распознан => arm "shutting down" => 300s => boot-fail. Фикс: сверять по mntonname (маунт-поинт). Overlay-патч, пересборка tools, деплой без ребута (umount/remount + рестарт сервисов).
