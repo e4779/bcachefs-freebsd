@@ -7,9 +7,9 @@
 Текучка: демон rctl 8G (rule на pid), монитор /tmp/f3-monitor.sh (пересоздаётся после ребута — скрипт в tmp/), heartbeat tmp/f3-heartbeat.log. Rescue-рычаг при wedge: mount -u -o timeout=N /mnt/pool (переводит вечный redirty-цикл в фейлящиеся записи; fuse_vfsops.c:237 update path).
 
 * Задачи
-** NEXT Fix A: fuse_mounted multi-device false-negative :port:boot:
+** DONE Fix A: fuse_mounted multi-device false-negative :port:boot:
 fusemount.rs:2340-2375 сверяет f_mntfromname с одиночным путём девайса; на multi-device там склеенная строка /dev/nda0p3:/dev/ada1 => никогда true => здоровый маунт не распознан => arm "shutting down" => 300s => boot-fail. Фикс: сверять по mntonname (маунт-поинт). Overlay-патч, пересборка tools, деплой без ребута (umount/remount + рестарт сервисов).
-** NEXT Fix B: wedge-catcher — поймать владельца umtx при следующем зависании :port:wedge:
+** DONE Fix B: wedge-catcher — поймать владельца umtx при следующем зависании :port:wedge:
 :PROPERTIES:
 :ID:       2a93749a-d986-11f1-a363-9c6b00bdbaa5
 :END:
@@ -38,3 +38,4 @@ amuled_svcj=NO временно (2026-11-06, утренний хаос был м
 - 2026-11-06 01:0x — инцидент #1 (wedge qbt write), артефакты сняты.
 - 2026-11-06 08:0x — boot-autostart настроен (poolfuse rc.d, rlimit root-aware — doas режет env и denies root→root), amuled-хаос = каскад обёрток, единственный реальный фатал — boot при пустом маунте.
 - 2026-11-06 09:0x — диагноз wedge и boot-fail из исходников (два исследователя), rescue-рычаг задокументирован.
+- 2026-11-06 09:11 — Fix A (patch 059) собран и задеплоен без ребута: маунт с первой попытки, проба цела. Fix B (wedge-catcher) валидирован боем: инцидент #3 снят автоматически (два клиента одновременно; демон при этом служит — stash 200; ретраи чужих write текут, wedged-потоки не восстанавливаются). FUSE-лог ограничен ротацией (был 42M строк, риск 8.6G/день).
