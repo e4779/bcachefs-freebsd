@@ -1,0 +1,17 @@
+--- a/src/wrappers/handle.rs
++++ b/src/wrappers/handle.rs
+@@ -284,6 +284,14 @@
+         let ret = unsafe {
+             libc::ioctl(ioctl_fd.as_raw_fd(), FS_IOC_GETFSSYSFSPATH, &mut fs_path)
+         };
++
++        #[cfg(target_os = "freebsd")]
++        let sysfs_fd = rustix::fs::open(
++            "/dev/null",
++            rustix::fs::OFlags::RDONLY,
++            rustix::fs::Mode::empty(),
++        )
++        .map_err(|e| BchError::from_raw(-e.raw_os_error()))?;
+ 
+         #[cfg(not(target_os = "freebsd"))]
+         let sysfs_fd = if ret == 0 {
