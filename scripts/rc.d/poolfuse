@@ -22,7 +22,7 @@ load_rc_config "$name"
 : ${poolfuse_tools:="/home/e4779/projects/bcachefs-freebsd"}
 : ${poolfuse_cap_mb:=8000}
 : ${poolfuse_wait_s:=90}
-: ${poolfuse_timeout_s:=300}
+: ${poolfuse_timeout_s:=0}   # 0 = infinite (Linux semantics): error only on daemon death (ENOTCONN); per-op timeouts kill slow HDD reads
 : ${poolfuse_fuse_log:=}
 
 start_cmd="poolfuse_start"
