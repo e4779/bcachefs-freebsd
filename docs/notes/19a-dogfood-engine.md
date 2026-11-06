@@ -186,3 +186,38 @@ WebUI qbt молчал (000), процесс жив. Kill -9 спасает, н�
 
 Следующие шаги: (1) воспроизвести под sysctl vfs.fusefs debug, (2) таймаут-обход на
 стороне клиента не существует => нужен фикс демона, (3) кандидаты: fuser форк upstream.
+
+## РАЗГОВОР С ИСТОЧНИКАМИ: полный диагноз wedge + boot-fail (2026-11-06 утро)
+
+Исследователи: fuse-kernel (releng/15.1 исходники) + bcachefs-fuser (клон + gh).
+
+### Wedge (баг #1) — механизм доказан
+- fdisp_wait_answ: таймаут ЕСТЬ (mount timeout=, дефолт 60с, clamp 0..600)
+- НО fuse_io_strategy на ETIMEDOUT: bdirty + ~B_DONE + ретрай (fuse_io.c:896-902)
+- fuse_write_biobackend: goto again по всем ошибкам кроме EINTR (:602-607)
+- => через bufwrite (data_cache_mode=1) = вечный 60с-цикл, очередь ms_head растёт
+- Демон-триггер: стеки инцидента #1 - НИ ОДИН поток демона в read(/dev/fuse);
+  event-loop застрял в umtx (userspace) => fuser/bcachefs мьютекс-дедлок
+- Kernel-side: lost-wakeup исключён (push+wakeup под одним ms_mtx)
+
+### Rescue-рычаг (доказан)
+mount -u -o timeout=N /mnt/pool - меняет на живом маунте (fuse_vfsops.c:237)
+Применение при wedge: переводит вечный цикл в фейлящиеся записи => сервисы получают
+ошибки и живут, демон можно перезапустить по-человечески.
+
+### Boot-fail (баг #2) - fuse_mounted false-negative
+fusemount.rs:2340-2375: сравнивает f_mntfromname с одиночным девайсом;
+на multi-device там СКЛЕЕННАЯ строка "/dev/nda0p3:/dev/ada1" => никогда true =>
+healthy mount не распознан => arm "shutting down" => 300s ожидание => boot-fail.
+Фикс: сверять по mntonname (маунт-поинт), не по fromname.
+
+### fuser read-loop: надёжен
+EAGAIN/EINTR ретраятся; partial read = ENODEV + смерть сессии (не потеря);
+ENODEV = штатный выход. Молчаливая потеря возможна ТОЛЬКО в reply (writev err ->
+error!() -> kernel ждёт unique). fuser#757, koverstreet destroy-before-reply.
+
+### План
+1. overlay: fuse_mounted по mntonname (маленький)
+2. порт: демон-дедлок — поймать umtx-владельца при следующем wedge
+   (стек-снимок демона ДЛЯТСЯ в момент wedge; искать владельца мьютекса)
+3. runbook: rescue-рычаг mount -u -o timeout=
