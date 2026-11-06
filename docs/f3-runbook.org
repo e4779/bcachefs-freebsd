@@ -33,6 +33,11 @@ Debian-эпоха: tools/hlmon (Rust, sysfs) собирал copygc_waiting/recon
 ** CANCELLED D: ядерная политика fail-fast — отклонена советом (redirty by design = data safety)
 ** WAITING F: break-glass откат на VM/NFS-мост — невозможен пока VM пересобирается; числовой триггер предзаписать
 ** TODO Апстрим: киты -> fuser#29/#757 + koverstreet форк :upstream:
+** TODO P5: кернел-патчи в апстрим freebsd-src (sys/fs/fuse) :upstream:kernel:
+Оба патча живут в overlay/patches/kernel/ (воспроизводимо с 9218d0c/c426039):
+- fuse_io-etimedout-fail-fast.patch — ETIMEDOUT на записи не должен молча ретраиться вечно (redirty-цикл)
+- fuse_ipc-deadline-cap.patch — PCATCH msleep перезапускался с новым окном на каждый периодический сигнал (форма-4 wedge: поток никогда не видел ETIMEDOUT)
+Путь: PR на github.com/freebsd/freebsd-src (или reviews.freebsd.org). До отправки: сверить с текущим main fuse_ipc.c/fuse_io.c (наш /usr/src 15.1), приложить репродюс/обоснование из журнала (форма-4, стеки из китов), текст — по скиллу opensource-contribution (без AI-slop, evidence-first). Проверить дубликаты: багрепорты про fuse EINTR wedges в bugs.freebsd.org.
 
 * Задачи
 ** DONE Fix A: fuse_mounted multi-device false-negative :port:boot:
