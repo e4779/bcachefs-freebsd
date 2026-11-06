@@ -1,0 +1,234 @@
+--- a/src/commands/fusemount/telemetry.rs
++++ b/src/commands/fusemount/telemetry.rs
+@@ -1,9 +1,12 @@
+ // SPDX-License-Identifier: GPL-2.0
+ 
+-//! Daemon-side telemetry for the FreeBSD FUSE port (P4 phase 0).
++//! Daemon-side telemetry for the FreeBSD FUSE port (P4 phase 0 + phase 1).
+ //!
+ //! SIGINFO (FreeBSD) / SIGUSR2 dump of the live accounting and counters,
+-//! written to the daemon's stderr log (BCACHEFS_FUSE_LOG in daemon mode).
++//! written to the daemon's stderr log (BCACHEFS_FUSE_LOG in daemon mode);
++//! and the periodic snapshot ring: every 60s an accounting.json written
++//! atomically (tmp + rename) under /var/run/bcachefs-fuse/<uuid>/, with
++//! timestamp, generation, pid and provenance - stale must look stale.
+ //!
+ //! Design constraints, from the P4 plan-of-record (docs/f3-runbook.org):
+ //!
+@@ -20,14 +23,17 @@
+ //! - No unwrap()/expect()/panicking indexing anywhere in this module.
+ 
+ use std::ffi::c_int;
++use std::path::PathBuf;
+ use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+ use std::sync::Arc;
+ use std::thread::{self, JoinHandle};
++use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+ 
+ use bch_bindgen::c;
+ use bcachefs_kernel::accounting;
+ use bcachefs_kernel::fs::Fs;
+ use bcachefs_kernel::util::rcu;
++use serde_json::{json, Map, Value};
+ 
+ use super::ensure_thread_init;
+ 
+@@ -158,10 +164,25 @@
+ 
+     let stop = Arc::new(AtomicBool::new(false));
+     let stop_thread = stop.clone();
++
++    // The fs uuid, as the ring dir's name: the published superblock's
++    // user_uuid - the same bytes the QUERY_UUID ioctl answers with.
++    let uuid_bytes: [u8; 16] = fs.sb.user_uuid.each_ref().map(|b| b.get());
++    let uuid = uuid::Uuid::from_bytes(uuid_bytes).to_string();
++
+     let fs = FsRaw(fs.as_ptr());
+-    let mountpoint = mountpoint.to_string();
+-    let devs: Vec<String> = devs.iter().map(|d| d.display().to_string()).collect();
+ 
++    let cfg = Cfg {
++        devs: devs.iter().map(|d| d.display().to_string()).collect(),
++        mountpoint: mountpoint.to_string(),
++        // Test/bench override: don't make root's /var/run a hard dep.
++        dir: std::env::var_os("BCACHEFS_FUSE_SNAPSHOT_DIR")
++            .filter(|v| !v.is_empty())
++            .map(PathBuf::from)
++            .unwrap_or_else(|| PathBuf::from("/var/run/bcachefs-fuse").join(&uuid)),
++        uuid,
++    };
++
+     let rfd = SIGINFO_PIPE_R.load(Ordering::SeqCst);
+     if rfd < 0 {
+         return inert_handle();
+@@ -174,7 +195,7 @@
+             // as the fuser workers do - mem_read()'s percpu walk and
+             // devs_rcu() need it.
+             ensure_thread_init();
+-            run(fs, rfd, stop_thread, &mountpoint, &devs);
++            run(fs, rfd, stop_thread, &cfg);
+         });
+     match join {
+         Ok(join) => Handle { stop, join: Some(join) },
+@@ -185,14 +206,38 @@
+     }
+ }
+ 
+-/// The thread: wait for signal-pipe bytes, dump, repeat until stopped.
+-fn run(fs: FsRaw, rfd: libc::c_int, stop: Arc<AtomicBool>, mountpoint: &str, devs: &[String]) {
++/// How often the snapshot ring is written.
++const SNAPSHOT_PERIOD: Duration = Duration::from_secs(60);
++
++/// Cap on "top" accounting entries in the snapshot.
++const SNAPSHOT_TOP_MAX: usize = 64;
++
++/// What the thread needs to know beyond the fs, fixed at spawn.
++struct Cfg {
++    uuid: String,
++    mountpoint: String,
++    devs: Vec<String>,
++    dir: PathBuf,
++}
++
++/// The thread: wait for signal-pipe bytes (dump on demand), tick the
++/// snapshot ring, repeat until stopped.
++fn run(fs: FsRaw, rfd: libc::c_int, stop: Arc<AtomicBool>, cfg: &Cfg) {
+     // SAFETY: the Handle joins this thread before the fs goes away - see
+     // FsRaw. Reborrowed per iteration so no &Fs is held anywhere it could
+     // outlive the join.
+     let fs: &Fs = unsafe { Fs::borrow_raw(fs.0.cast()) };
+ 
++    // Snapshot immediately, so the ring dir says "live" from the first
++    // minute of the mount - and so an unwritable dir complains at mount
++    // time, not an hour in.
++    let mut gen: u64 = 1;
++    write_snapshot(fs, cfg, gen);
++
+     let mut polls = [libc::pollfd { fd: rfd, events: libc::POLLIN, revents: 0 }];
++    let mut next = Instant::now()
++        .checked_add(SNAPSHOT_PERIOD)
++        .unwrap_or_else(Instant::now);
+     loop {
+         // Wake at most a second late for the stop flag.
+         let n = unsafe { libc::poll(polls.as_mut_ptr(), 1, 1000) };
+@@ -201,8 +246,17 @@
+         }
+         if n > 0 && polls[0].revents & libc::POLLIN != 0 {
+             drain(rfd);
+-            dump(fs, mountpoint, devs);
++            dump(fs, &cfg.mountpoint, &cfg.devs);
+         }
++        if Instant::now() >= next {
++            // advance from the schedule, not from "now", so the ring
++            // doesn't drift a poll-interval per snapshot
++            next = next
++                .checked_add(SNAPSHOT_PERIOD)
++                .unwrap_or_else(Instant::now);
++            gen = gen.wrapping_add(1);
++            write_snapshot(fs, cfg, gen);
++        }
+     }
+ }
+ 
+@@ -341,6 +395,101 @@
+     out
+ }
+ 
++/// Capacity/used/free in sectors, lock-free: the percpu usage sums and the
++/// published capacity field - the arithmetic usage_read_short() does under
++/// mark_lock, on the same numbers, without taking the lock.
++/// reserve_factor() is alloc/capacity.rs's, copied (it isn't exported).
++fn usage_short_external(fs: &Fs) -> (u64, u64, u64) {
++    let base = fs.usage_base();
++    let reserved = base.reserved.wrapping_add(fs.online_reserved());
++    let factor = reserved.wrapping_add(
++        reserved.next_multiple_of(1u64 << c::RESERVE_FACTOR) >> c::RESERVE_FACTOR);
++    let capacity = fs.capacity.capacity.get().wrapping_sub(base.hidden);
++    let used = capacity.min(base.data.wrapping_add(base.btree).wrapping_add(factor));
++    (capacity, used, capacity.wrapping_sub(used))
++}
++
++/// The snapshot ring write: /var/run/bcachefs-fuse/<uuid>/accounting.json,
++/// atomically (same-dir tmp + rename). One mem_read pass up front
++/// (collect_entries); no locks, and nothing borrowed from the fs by the
++/// time the file is written. Errors are logged and lived with - an
++/// unwritable /var/run must never take the mount down.
++fn write_snapshot(fs: &Fs, cfg: &Cfg, gen: u64) {
++    let entries = collect_entries(fs);
++
++    // The gate metrics, always whole: reconcile_work per type and
++    // dev_leaving per device, even where all-zero.
++    let mut reconcile = Map::new();
++    let mut leaving = Map::new();
++    for e in entries.iter() {
++        if let Some(name) = e.key.strip_prefix("rw_") {
++            reconcile.insert(name.to_string(), json!(e.counters));
++        } else if let Some(dev) = e.key.strip_prefix("leaving_dev") {
++            leaving.insert(dev.to_string(), json!(e.counters[0]));
++        }
++    }
++
++    let find = |key: &str| -> [u64; 3] {
++        entries.iter().find(|e| e.key == key).map_or([0, 0, 0], |e| e.counters)
++    };
++    let btree = find("btree_total");
++    let compression = find("compression_total");
++    let nr_inodes = find("nr_inodes");
++    let rebalance = find("rebalance");
++
++    // Top entries by largest counter, capped.
++    let mut top: Vec<(&Entry, u64)> = entries.iter()
++        .map(|e| (e, e.counters.iter().fold(0u64, |m, &v| m.max(v))))
++        .collect();
++    top.sort_by(|a, b| b.1.cmp(&a.1));
++    let top_json: Vec<Value> = top.into_iter().take(SNAPSHOT_TOP_MAX)
++        .map(|(e, _)| json!({ "pos": e.key, "v": e.counters }))
++        .collect();
++
++    let counters: Vec<u64> = (0..c::BCH_COUNTER_NR as usize)
++        .map(|i| fs.counter_read(i))
++        .collect();
++
++    let (capacity, used, free) = usage_short_external(fs);
++
++    let mut doc = Map::new();
++    // Stale must look stale: ts is the wall clock of the last write, gen
++    // counts writes within this mount, pid says which daemon.
++    doc.insert("provenance".into(), json!("live"));
++    doc.insert("ts".into(), json!(SystemTime::now()
++        .duration_since(UNIX_EPOCH)
++        .map_or(0.0, |d| d.as_secs_f64())));
++    doc.insert("gen".into(), json!(gen));
++    doc.insert("pid".into(), json!(std::process::id()));
++    doc.insert("uuid".into(), json!(cfg.uuid));
++    doc.insert("mountpoint".into(), json!(cfg.mountpoint));
++    doc.insert("devices".into(), json!(cfg.devs));
++    doc.insert("sectors".into(), json!({
++        "capacity": capacity, "used": used, "free": free,
++    }));
++    doc.insert("reconcile_work".into(), Value::Object(reconcile));
++    doc.insert("dev_leaving".into(), Value::Object(leaving));
++    doc.insert("btree_total".into(), json!(btree));
++    doc.insert("compression_total".into(), json!(compression));
++    doc.insert("nr_inodes".into(), json!(nr_inodes[0]));
++    doc.insert("rebalance_work".into(), json!(rebalance[0]));
++    doc.insert("counters".into(), json!(counters));
++    doc.insert("top".into(), Value::Array(top_json));
++
++    let text = Value::Object(doc).to_string();
++    let dir = &cfg.dir;
++    let result = (|| -> std::io::Result<()> {
++        std::fs::create_dir_all(dir)?;
++        let tmp = dir.join(".accounting.json.tmp");
++        std::fs::write(&tmp, text.as_bytes())?;
++        std::fs::rename(&tmp, dir.join("accounting.json"))?;
++        Ok(())
++    })();
++    if let Err(e) = result {
++        eprintln!("bcachefs fuse: telemetry: snapshot {}: {}", dir.display(), e);
++    }
++}
++
+ /// The SIGINFO dump: one summary line of the interesting accounting, then
+ /// the nonzero persistent counters; at most 64 lines in all.
+ fn dump(fs: &Fs, mountpoint: &str, devs: &[String]) {
