@@ -1,0 +1,4 @@
+module boot copy: 
+-r--r--r--  1 root wheel 122928 Nov  6 11:16 /boot/kernel/fusefs.ko
+-rw-r--r--  1 root wheel 122928 Nov  6 11:16 /usr/obj/usr/src/amd64.amd64/sys/modules/fusefs/fusefs.ko
+ 5    1 0xffffffff87206000    1d5e8 fusefs.ko (/boot/kernel/fusefs.ko)

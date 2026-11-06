@@ -1,0 +1,10 @@
+  PID    TID COMM                TDNAME              KSTACK                       
+ 4249 108323 qbittorrent-nox     -                   mi_switch sleepq_catch_signals sleepq_wait_sig _sleep umtxq_sleep do_wait __umtx_op_wait_uint_private sys__umtx_op amd64_syscall fast_syscall_common 
+ 4249 109934 qbittorrent-nox     libtorrent-network- mi_switch sleepq_catch_signals sleepq_timedwait_sig _sleep fdisp_wait_answ fuse_write_directbackend fuse_io_strategy fuse_vnop_strategy bufstrategy bufwrite fuse_write_biobackend fuse_vnop_write VOP_WRITE_APV vn_write vn_io_fault dofilewrite sys_write amd64_syscall 
+ 4249 109935 qbittorrent-nox     -                   mi_switch sleepq_catch_signals sleepq_wait_sig _sleep umtxq_sleep do_wait __umtx_op_wait_uint_private sys__umtx_op amd64_syscall fast_syscall_common 
+ 4249 109936 qbittorrent-nox     SessionImpl m_ioThr mi_switch sleepq_catch_signals sleepq_wait_sig _cv_wait_sig seltdwait kern_poll_kfds kern_poll sys_ppoll amd64_syscall fast_syscall_common 
+ 4249 109937 qbittorrent-nox     SessionImpl m_async mi_switch sleepq_catch_signals sleepq_wait_sig _sleep umtxq_sleep do_wait __umtx_op_wait_uint_private sys__umtx_op amd64_syscall fast_syscall_common 
+ 4249 109939 qbittorrent-nox     BencodeResumeDataSt mi_switch sleepq_catch_signals sleepq_wait_sig _cv_wait_sig seltdwait kern_poll_kfds kern_poll sys_ppoll amd64_syscall fast_syscall_common 
+ 4249 109941 qbittorrent-nox     TorrentFilesWatcher mi_switch sleepq_catch_signals sleepq_wait_sig _cv_wait_sig seltdwait kern_poll_kfds kern_poll sys_ppoll amd64_syscall fast_syscall_common 
+ 4249 109942 qbittorrent-nox     RSS::Session m_work mi_switch sleepq_catch_signals sleepq_wait_sig _cv_wait_sig seltdwait kern_poll_kfds kern_poll sys_ppoll amd64_syscall fast_syscall_common 
+ 4249 109943 qbittorrent-nox     RSS::AutoDownloader mi_switch sleepq_catch_signals sleepq_wait_sig _cv_wait_sig seltdwait kern_poll_kfds kern_poll sys_ppoll amd64_syscall fast_syscall_common 

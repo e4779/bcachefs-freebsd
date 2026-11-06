@@ -1,0 +1,30 @@
+linux: jid 0 pid 58434 (grpck): unsupported prctl option 27
+linux: jid 0 pid 58434 (grpck): unsupported prctl option 39
+linux: jid 0 pid 58434 (grpck): unsupported prctl option 47
+linux: jid 0 pid 58435 (pwconv): unsupported prctl option 27
+linux: jid 0 pid 58435 (pwconv): unsupported prctl option 39
+linux: jid 0 pid 58435 (pwconv): unsupported prctl option 47
+linux: jid 0 pid 58441 (grpconv): unsupported prctl option 27
+linux: jid 0 pid 58441 (grpconv): unsupported prctl option 39
+linux: jid 0 pid 58441 (grpconv): unsupported prctl option 47
+linux: jid 0 pid 58842 (systemd-machine-id-): unsupported prctl option 27
+linux: jid 0 pid 58842 (systemd-machine-id-): unsupported prctl option 39
+linux: jid 0 pid 58842 (systemd-machine-id-): unsupported prctl option 47
+linux: jid 0 pid 58844 (journalctl): unsupported prctl option 27
+linux: jid 0 pid 58844 (journalctl): unsupported prctl option 39
+linux: jid 0 pid 58844 (journalctl): unsupported prctl option 47
+linux: jid 0 pid 58845 (systemd-tmpfiles): unsupported prctl option 27
+linux: jid 0 pid 58845 (systemd-tmpfiles): unsupported prctl option 39
+linux: jid 0 pid 58845 (systemd-tmpfiles): unsupported prctl option 47
+linux: jid 0 pid 58846 (systemd-sysusers): unsupported prctl option 27
+linux: jid 0 pid 58846 (systemd-sysusers): unsupported prctl option 39
+linux: jid 0 pid 58846 (systemd-sysusers): unsupported prctl option 47
+linux: jid 0 pid 58846 (systemd-sysusers): unsupported fcntl cmd 38
+linux: jid 0 pid 59482 (systemd-sysusers): unsupported prctl option 27
+linux: jid 0 pid 59482 (systemd-sysusers): unsupported prctl option 39
+linux: jid 0 pid 59482 (systemd-sysusers): unsupported prctl option 47
+linux: jid 0 pid 59482 (systemd-sysusers): unsupported fcntl cmd 38
+sonewconn: pcb 0xfffff803762ee000 ([::]:8094 (proto 6)): Listen queue overflow: 76 already in queue awaiting acceptance (1 occurrences), euid 1000, rgid 1000, jail svcj-qbittorrent
+Limiting tcp reset response from 2053 to 209 packets/sec
+sonewconn: pcb 0xfffff805bdd21540 ([::]:8094 (proto 6)): Listen queue overflow: 76 already in queue awaiting acceptance (1 occurrences), euid 1000, rgid 1000, jail svcj-qbittorrent
+sonewconn: pcb 0xfffff805bdd21540 ([::]:8094 (proto 6)): Listen queue overflow: 76 already in queue awaiting acceptance (28 occurrences), euid 1000, rgid 1000, jail svcj-qbittorrent

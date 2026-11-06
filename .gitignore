@@ -2,3 +2,4 @@ tools/
 .pi/
 *.log
 tmp/
+docs/evidence/**/daemon-truss.txt
