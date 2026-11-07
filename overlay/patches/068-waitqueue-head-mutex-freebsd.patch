@@ -1,0 +1,156 @@
+--- a/include/linux/wait.h
++++ b/include/linux/wait.h
+@@ -19,7 +19,12 @@
+ };
+ 
+ struct wait_queue_head {
+-	spinlock_t		lock;
++	/* FreeBSD: pthread_spinlock_t is a POINTER - the static
++	 * initializer below would store NULL and pthread_spin_lock(NULL)
++	 * fails EINVAL WITHOUT locking (no-op lock: core 83736's wake
++	 * race). pthread_mutex_t has a real static initializer, and this
++	 * shim's waitqueue critical sections never sleep under it. */
++	pthread_mutex_t		lock;
+ 	struct list_head	task_list;
+ };
+ 
+@@ -40,7 +45,7 @@
+ 	}
+ 
+ #define __WAIT_QUEUE_HEAD_INITIALIZER(name) {				\
+-	.lock		= __SPIN_LOCK_UNLOCKED(name.lock),		\
++	.lock		= PTHREAD_MUTEX_INITIALIZER,			\
+ 	.task_list	= { &(name).task_list, &(name).task_list } }
+ 
+ #define DECLARE_WAIT_QUEUE_HEAD(name) \
+@@ -48,7 +53,7 @@
+ 
+ static inline void init_waitqueue_head(wait_queue_head_t *q)
+ {
+-	spin_lock_init(&q->lock);
++	pthread_mutex_init(&q->lock, NULL);
+ 	INIT_LIST_HEAD(&q->task_list);
+ }
+ 
+--- a/linux/wait.c
++++ b/linux/wait.c
+@@ -57,9 +57,9 @@
+ {
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&q->lock, flags);
++	pthread_mutex_lock(&q->lock);
+ 	__wake_up_common(q, mode, nr_exclusive, 0, key);
+-	spin_unlock_irqrestore(&q->lock, flags);
++	pthread_mutex_unlock(&q->lock);
+ }
+ 
+ void wake_up(wait_queue_head_t *q)
+@@ -83,11 +83,11 @@
+ 	unsigned long flags;
+ 
+ 	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
+-	spin_lock_irqsave(&q->lock, flags);
++	pthread_mutex_lock(&q->lock);
+ 	if (list_empty(&wait->task_list))
+ 		__add_wait_queue(q, wait);
+ 	set_current_state(state);
+-	spin_unlock_irqrestore(&q->lock, flags);
++	pthread_mutex_unlock(&q->lock);
+ }
+ 
+ static void
+@@ -96,11 +96,11 @@
+ 	unsigned long flags;
+ 
+ 	wait->flags |= WQ_FLAG_EXCLUSIVE;
+-	spin_lock_irqsave(&q->lock, flags);
++	pthread_mutex_lock(&q->lock);
+ 	if (list_empty(&wait->task_list))
+ 		__add_wait_queue_tail(q, wait);
+ 	set_current_state(state);
+-	spin_unlock_irqrestore(&q->lock, flags);
++	pthread_mutex_unlock(&q->lock);
+ }
+ 
+ void finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
+@@ -122,9 +122,9 @@
+ 	 *    the list).
+ 	 */
+ 	if (!list_empty_careful(&wait->task_list)) {
+-		spin_lock_irqsave(&q->lock, flags);
++		pthread_mutex_lock(&q->lock);
+ 		list_del_init(&wait->task_list);
+-		spin_unlock_irqrestore(&q->lock, flags);
++		pthread_mutex_unlock(&q->lock);
+ 	}
+ }
+ 
+@@ -233,15 +233,15 @@
+ {
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&x->wait.lock, flags);
++	pthread_mutex_lock(&x->wait.lock);
+ 	x->done++;
+ 	__wake_up_locked(&x->wait, TASK_NORMAL, 1);
+-	spin_unlock_irqrestore(&x->wait.lock, flags);
++	pthread_mutex_unlock(&x->wait.lock);
+ }
+ 
+ void wait_for_completion(struct completion *x)
+ {
+-	spin_lock_irq(&x->wait.lock);
++	pthread_mutex_lock(&x->wait.lock);
+ 
+ 	if (!x->done) {
+ 		DECLARE_WAITQUEUE(wait, current);
+@@ -249,10 +249,10 @@
+ 		__add_wait_queue_tail_exclusive(&x->wait, &wait);
+ 		do {
+ 			__set_current_state(TASK_UNINTERRUPTIBLE);
+-			spin_unlock_irq(&x->wait.lock);
++			pthread_mutex_unlock(&x->wait.lock);
+ 
+ 			schedule();
+-			spin_lock_irq(&x->wait.lock);
++			pthread_mutex_lock(&x->wait.lock);
+ 		} while (!x->done);
+ 		__remove_wait_queue(&x->wait, &wait);
+ 		if (!x->done)
+@@ -260,12 +260,12 @@
+ 	}
+ 	x->done--;
+ out:
+-	spin_unlock_irq(&x->wait.lock);
++	pthread_mutex_unlock(&x->wait.lock);
+ }
+ 
+ unsigned long wait_for_completion_timeout(struct completion *x, unsigned long timeout)
+ {
+-	spin_lock_irq(&x->wait.lock);
++	pthread_mutex_lock(&x->wait.lock);
+ 
+ 	if (!x->done) {
+ 		DECLARE_WAITQUEUE(wait, current);
+@@ -273,10 +273,10 @@
+ 		__add_wait_queue_tail_exclusive(&x->wait, &wait);
+ 		do {
+ 			__set_current_state(TASK_UNINTERRUPTIBLE);
+-			spin_unlock_irq(&x->wait.lock);
++			pthread_mutex_unlock(&x->wait.lock);
+ 
+ 			timeout = schedule_timeout(timeout);
+-			spin_lock_irq(&x->wait.lock);
++			pthread_mutex_lock(&x->wait.lock);
+ 		} while (!x->done);
+ 		__remove_wait_queue(&x->wait, &wait);
+ 		if (!x->done)
+@@ -284,6 +284,6 @@
+ 	}
+ 	x->done--;
+ out:
+-	spin_unlock_irq(&x->wait.lock);
++	pthread_mutex_unlock(&x->wait.lock);
+ 	return timeout;
+ }
