@@ -1,0 +1,27 @@
+#!/bin/sh
+
+# shellcheck disable=SC1091,SC2034,SC2154  # rc.subr contract
+# f3heal — supervised recovery for the bcachefs FUSE pool (Ф3):
+# daemon-only first aid on daemon death / frozen telemetry ring,
+# full-stack bounce as escalation. Contract: scripts/f3-heal.sh header.
+# MAINTENANCE: service f3heal onestop before deliberate poolfuse stops,
+# or it will re-mount the pool within DEAD_N minutes.
+
+# PROVIDE: f3heal
+# REQUIRE: poolfuse
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="f3heal"
+rcvar="f3heal_enable"
+desc="bcachefs FUSE pool supervised recovery (f3-heal v2)"
+
+load_rc_config "$name"
+: "${f3heal_enable:=NO}"
+
+pidfile="/var/run/${name}.pid"
+command="/usr/sbin/daemon"
+command_args="-c -r -R 10 -P /var/run/${name}.pid /usr/local/libexec/f3-heal.sh"
+
+run_rc_command "$1"
