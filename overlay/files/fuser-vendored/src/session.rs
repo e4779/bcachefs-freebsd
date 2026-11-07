@@ -13,6 +13,7 @@ use std::os::fd::BorrowedFd;
 use std::os::fd::OwnedFd;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::RwLock;
 use std::thread::JoinHandle;
@@ -291,6 +292,9 @@ impl<FS: Filesystem> Session<FS> {
 
         let mut threads = Vec::with_capacity(n_threads);
 
+        let session_dead = Arc::new(AtomicBool::new(false));
+        let readers: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(Vec::new()));
+        install_reader_kick_handler();
         for (i, ch) in channels.into_iter().enumerate() {
             let thread_name = format!("fuser-{i}");
             let event_loop = SessionEventLoop {
@@ -299,6 +303,8 @@ impl<FS: Filesystem> Session<FS> {
                 ch,
                 allowed,
                 session_owner,
+                session_dead: session_dead.clone(),
+                readers: readers.clone(),
             };
             threads.push(
                 thread::Builder::new()
@@ -507,6 +513,22 @@ impl SessionUnmounter {
     }
 }
 
+/// SIGURG with SA_RESTART deliberately OFF: the kick must interrupt
+/// blocking reads (EINTR), not auto-restart them. No-op body - the
+/// interrupted loop does the deciding. Process-wide; installed once per
+/// Session::run (idempotent).
+extern "C" fn reader_kick_handler(_sig: libc::c_int) {}
+
+fn install_reader_kick_handler() {
+    let mut act: libc::sigaction = unsafe { std::mem::zeroed() };
+    act.sa_sigaction = reader_kick_handler as libc::sighandler_t;
+    unsafe {
+        libc::sigemptyset(&mut act.sa_mask);
+        act.sa_flags = 0; // no SA_RESTART: EINTR must surface
+        libc::sigaction(libc::SIGURG, &act, std::ptr::null_mut());
+    }
+}
+
 pub(crate) struct SessionEventLoop<FS: Filesystem> {
     /// Cache thread name for faster `debug!`.
     pub(crate) thread_name: String,
@@ -514,6 +536,12 @@ pub(crate) struct SessionEventLoop<FS: Filesystem> {
     pub(crate) filesystem: Arc<FilesystemHolder<FS>>,
     pub(crate) allowed: SessionACL,
     pub(crate) session_owner: Uid,
+    /// Set by whichever reader sees FUSE_DESTROY (FreeBSD delivers it to
+    /// exactly one); the other readers are kicked with SIGURG so their
+    /// blocking reads return EINTR and they observe the flag.
+    pub(crate) session_dead: Arc<AtomicBool>,
+    /// All live reader thread ids (pthread_self as usize), for the kick.
+    pub(crate) readers: Arc<Mutex<Vec<usize>>>,
 }
 
 impl<FS: Filesystem> SessionEventLoop<FS> {
@@ -521,11 +549,14 @@ impl<FS: Filesystem> SessionEventLoop<FS> {
         // Buffer for receiving requests from the kernel. Only one is allocated and
         // it is reused immediately after dispatching to conserve memory and allocations.
         let mut buf = FuseReadBuf::new();
+        // FreeBSD liveness: register so the Destroy reader can kick us out
+        // of a blocking read (see Channel::receive_session_aware).
+        self.readers.lock().push(unsafe { libc::pthread_self() } as usize);
         let buf = buf.as_mut();
         loop {
             // Read the next request from the given channel to kernel driver
             // The kernel driver makes sure that we get exactly one request per read
-            match self.ch.receive_retrying(buf) {
+            match self.ch.receive_session_aware(buf, &self.session_dead) {
                 Ok(size) => match RequestWithSender::new(self.ch.sender(), &buf[..size]) {
                     // Dispatch request
                     Some(req) => {
@@ -539,6 +570,24 @@ impl<FS: Filesystem> SessionEventLoop<FS> {
                             // order too.
                             self.filesystem.destroy();
                             req.reply::<ReplyEmpty>().ok();
+                            // FreeBSD: the other readers are asleep in
+                            // read(2) on our shared fd and the kernel will
+                            // never wake them. Flag the death, then kick
+                            // every reader: SIGURG's no-op handler is
+                            // installed without SA_RESTART, so their reads
+                            // return EINTR and the flag turns it into an
+                            // exit.
+                            self.session_dead.store(true, Ordering::Release);
+                            let tids: Vec<usize> = self.readers.lock().clone();
+                            for tid in tids {
+                                unsafe {
+                                    // ESRCH: the thread already exited - fine.
+                                    libc::pthread_kill(
+                                        tid as libc::pthread_t,
+                                        libc::SIGURG,
+                                    );
+                                }
+                            }
                             return Ok(());
                         } else {
                             req.dispatch(self)

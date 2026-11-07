@@ -1,7 +1,9 @@
 use std::io;
 use std::os::fd::AsFd;
+use std::os::fd::AsRawFd;
 use std::os::fd::BorrowedFd;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use nix::errno::Errno;
 
@@ -41,6 +43,32 @@ impl Channel {
         loop {
             match self.receive(buffer) {
                 Ok(size) => return Ok(size),
+                Err(Errno::ENOENT | Errno::EINTR | Errno::EAGAIN) => continue,
+                Err(err) => return Err(err),
+            }
+        }
+    }
+
+    /// Receives with the session's death in view (FreeBSD liveness): a
+    /// forced unmount delivers FUSE_DESTROY to exactly ONE blocked reader
+    /// and never wakes the others - no ENODEV, no EOF. With one shared fd
+    /// (FreeBSD has no FUSE_DEV_IOC_CLONE) most readers are ALREADY parked
+    /// inside read(2) when Destroy arrives, so a poll loop cannot reach
+    /// them: the Destroy handler kicks every reader with pthread_kill
+    /// (SIGURG, no-op handler without SA_RESTART), the read returns EINTR,
+    /// and this loop turns EINTR into an exit once @session_dead is set.
+    /// Steady-state cost: zero extra syscalls.
+    pub(crate) fn receive_session_aware(
+        &self,
+        buffer: &mut [u8],
+        session_dead: &AtomicBool,
+    ) -> nix::Result<usize> {
+        loop {
+            match self.receive(buffer) {
+                Ok(size) => return Ok(size),
+                Err(Errno::EINTR) if session_dead.load(Ordering::Acquire) => {
+                    return Err(Errno::ENODEV)
+                }
                 Err(Errno::ENOENT | Errno::EINTR | Errno::EAGAIN) => continue,
                 Err(err) => return Err(err),
             }
