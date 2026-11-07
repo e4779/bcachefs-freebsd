@@ -1,0 +1,54 @@
+(lldb) target create "/home/e4779/projects/bcachefs-freebsd/tools/target/release/bcachefs" --core "bcachefs.core"
+Core file '/home/e4779/projects/bcachefs-freebsd/docs/evidence/core-83736-journal-replay-wake/bcachefs.core' (x86_64) was loaded.
+(lldb) bt
+* thread #1, name = 'bcachefs', stop reason = signal SIGSEGV
+  * frame #0: 0x000034cf8b226cca libsys.so.7`__sys_thr_kill + 10
+    frame #1: 0x000034cf87bfd9a4 libc.so.7`__raise + 52
+    frame #2: 0x000034c75d200f63 bcachefs`fatal_signal_handler(signo=11) at tools-util.c:69:2
+    frame #3: 0x000034cf8604844c libthr.so.3`___lldb_unnamed_symbol699 + 204
+    frame #4: 0x000034cf86047a5b libthr.so.3`___lldb_unnamed_symbol681 + 315
+    frame #5: 0x000034cf7ea202d3
+    frame #6: 0x000034c75d2a882d bcachefs`wake_up_bit [inlined] __wake_up_common(q=<unavailable>, mode=3, nr_exclusive=<unavailable>, wake_flags=0, key=0x000034cf7dfb8580) at wait.c:49:7
+    frame #7: 0x000034c75d2a8802 bcachefs`wake_up_bit [inlined] __wake_up(q=<unavailable>, mode=3, nr_exclusive=1, key=0x000034cf7dfb8580) at wait.c:61:2
+    frame #8: 0x000034c75d2a87f0 bcachefs`wake_up_bit(word=<unavailable>, bit=13) at wait.c:184:3
+    frame #9: 0x000034c75d253c0e bcachefs`btree_node_write_endio(bio=0x000056955a721170) at write.c:249:2
+    frame #10: 0x000034c75d29a14e bcachefs`generic_make_request(bio=0x000056955a721170) at blkdev.c:160:3
+    frame #11: 0x000034c75d265166 bcachefs`bch2_submit_wbio_replicas [inlined] submit_bio(bio=<unavailable>) at blkdev.h:43:2
+    frame #12: 0x000034c75d265161 bcachefs`bch2_submit_wbio_replicas(wbio=0x000056955a7210e0, c=0x0000569548aa7b40, type=BCH_DATA_btree, k=0x000034cf7dfb8740, nocow=false, cas=0x0000000000000000) at write.c:1233:4
+    frame #13: 0x000034c75d253ebd bcachefs`bch2_trans_submit_write_bios [inlined] btree_write_do_submit(wbio=0x000056955a721000) at write.c:296:2
+    frame #14: 0x000034c75d253e9d bcachefs`bch2_trans_submit_write_bios(trans=<unavailable>) at write.c:603:3
+    frame #15: 0x000034c75d243c33 bcachefs`__bch2_trans_unlock(trans=<unavailable>) at locking.c:1173:3 [artificial]
+    frame #16: 0x000034c75d243c9a bcachefs`bch2_trans_unlock(trans=0x000056964338e000) at locking.c:1252:2
+    frame #17: 0x000034c75d213a32 bcachefs`bch2_btree_node_fill(trans=0x000056964338e000, path=0x000056964338e2d0, k=0x000056964338e150, btree_id=BTREE_ID_reflink, level=<unavailable>, lock_type=SIX_LOCK_intent, sync=true) at cache.c:1271:4
+    frame #18: 0x000034c75d212e6f bcachefs`__bch2_btree_node_get(trans=0x000056964338e000, path=0x000056964338e2d0, k=0x000056964338e150, level=0, lock_type=SIX_LOCK_intent, flags=BTREE_ITER_intent | BTREE_ITER_not_extents | BTREE_ITER_with_journal | BTREE_ITER_snapshot_field | BTREE_ITER_all_snapshots) at cache.c:1402:7
+    frame #19: 0x000034c75d212a98 bcachefs`bch2_btree_node_get(trans=<unavailable>, path=<unavailable>, k=<unavailable>, level=<unavailable>, lock_type=<unavailable>, flags=<unavailable>) at cache.c:0 [artificial]
+    frame #20: 0x000034c75d233d8e bcachefs`bch2_btree_path_traverse_one [inlined] btree_path_down(trans=0x000056964338e000, path=0x000056964338e2d0, flags=BTREE_ITER_intent | BTREE_ITER_not_extents | BTREE_ITER_with_journal | BTREE_ITER_snapshot_field | BTREE_ITER_all_snapshots) at iter.c:1257:20
+    frame #21: 0x000034c75d233d2f bcachefs`bch2_btree_path_traverse_one(trans=0x000056964338e000, path_idx=1, flags=BTREE_ITER_intent | BTREE_ITER_not_extents | BTREE_ITER_with_journal | BTREE_ITER_snapshot_field | BTREE_ITER_all_snapshots) at iter.c:1480:6
+    frame #22: 0x000034c75d235fc3 bcachefs`bch2_btree_iter_traverse [inlined] bch2_btree_path_traverse(trans=<unavailable>, path=<unavailable>, flags=<unavailable>) at locking.h:162:5
+    frame #23: 0x000034c75d235fbb bcachefs`bch2_btree_iter_traverse(iter=0x000034cf7dfb8a70) at iter.c:2341:2
+    frame #24: 0x000034c75d275245 bcachefs`bch2_journal_replay_key(trans=0x000056964338e000, k=0x0000569604a70450) at recovery.c:140:2
+    frame #25: 0x000034c75d274c1a bcachefs`bch2_journal_replay(c=0x0000569548aa7b40) at recovery.c:289:4
+    frame #26: 0x000034c75d5e2269 bcachefs`bcachefs_kernel::init::passes::run_passes [inlined] bcachefs_kernel::init::passes::run_pass(fs=0x0000569548aa7b40, pass=BCH_RECOVERY_PASS_journal_replay) at passes.rs:755:43
+    frame #27: 0x000034c75d5e21a7 bcachefs`bcachefs_kernel::init::passes::run_passes(fs=0x0000569548aa7b40, passes=<unavailable>, failfast=<unavailable>) at passes.rs:874:20
+    frame #28: 0x000034c75d5e404f bcachefs`bcachefs_kernel::init::passes::run_passes_startup(fs=0x0000569548aa7b40, from=<unavailable>) at passes.rs:1006:9
+    frame #29: 0x000034c75d5f6487 bcachefs`bch2_run_recovery_passes_startup [inlined] bcachefs_kernel::init::passes::bch2_run_recovery_passes_startup(c=<unavailable>, from=<unavailable>) at passes.rs:1036:14
+    frame #30: 0x000034c75d5f6481 bcachefs`bch2_run_recovery_passes_startup(c=<unavailable>, from=<unavailable>) at passes.rs:1034:1
+    frame #31: 0x000034c75d275e65 bcachefs`bch2_fs_recovery [inlined] __bch2_fs_recovery(c=0x0000569548aa7b40) at recovery.c:762:2
+    frame #32: 0x000034c75d275760 bcachefs`bch2_fs_recovery(c=0x0000569548aa7b40) at recovery.c:914:12
+    frame #33: 0x000034c75d271bb6 bcachefs`__bch2_fs_start(c=0x0000569548aa7b40, err=0x000034cf7dfb90e0) at fs.c:1424:2
+    frame #34: 0x000034c75d2714d9 bcachefs`bch2_fs_start(c=0x0000569548aa7b40) at fs.c:1452:12
+    frame #35: 0x000034c75d582877 bcachefs`<bcachefs_kernel::cstructs::types::Fs>::start(self=<unavailable>) at fs.rs:308:32
+    frame #36: 0x000034c75d1db905 bcachefs`bcachefs::commands::fusemount::cmd_fusemount(cli=Cli @ 0x000034cf7dfb9790) at fusemount.rs:2634:24
+    frame #37: 0x000034c75d14a6d0 bcachefs`bcachefs::commands::mount::CMD::__run [inlined] bcachefs::commands::mount::mount(cli=Cli @ 0x000034cf7dfb9688) at mount.rs:947:26
+    frame #38: 0x000034c75d14a18b bcachefs`bcachefs::commands::mount::CMD::__run(argv=<unavailable>) at mount.rs:982:9
+    frame #39: 0x000034c75d18be25 bcachefs`<bcachefs::commands::CmdDef>::dispatch_with_path(self=<unavailable>, argv=Vec<alloc::string::String, alloc::alloc::Global> @ 0x000034cf7dfb9da0, command_path=String @ 0x000034cf7dfb9e08) at mod.rs:140:17
+    frame #40: 0x000034c75d18b3bf bcachefs`bcachefs::main [inlined] <bcachefs::commands::CmdDef>::dispatch(self=0x000034c75d6e0a98, argv=Vec<alloc::string::String, alloc::alloc::Global> @ 0x000034cf7dfb9da0) at mod.rs:131:14
+    frame #41: 0x000034c75d18b37d bcachefs`bcachefs::main [inlined] bcachefs::commands::dispatch(name=(data_ptr = "mount", length = 5), argv=<unavailable>) at mod.rs:193:33
+    frame #42: 0x000034c75d18b262 bcachefs`bcachefs::main at bcachefs.rs:423:11
+    frame #43: 0x000034c75d0e6063 bcachefs`std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> std::process::ExitCode, std::process::ExitCode> [inlined] <fn() -> std::process::ExitCode as core::ops::function::FnOnce<((null)=<unavailable>, (null)=<unavailable>)>>::call_once at function.rs:250:5
+    frame #44: 0x000034c75d0e6061 bcachefs`std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> std::process::ExitCode, std::process::ExitCode>(f=<unavailable>) at backtrace.rs:166:18
+    frame #45: 0x000034c75d11c0a9 bcachefs`std::rt::lang_start::<std::process::ExitCode>::{closure#0} at rt.rs:206:18
+    frame #46: 0x000034c75d672188 bcachefs`std::rt::lang_start_internal + 1160
+    frame #47: 0x000034c75d1a0a5c bcachefs`main + 44
+    frame #48: 0x000034cf87bd228f libc.so.7`__libc_start1 + 303
+    frame #49: 0x000034c75d06cb11 bcachefs`_start at crt1_s.S:80
