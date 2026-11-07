@@ -1,0 +1,57 @@
+--- a/src/commands/fusemount/telemetry.rs
++++ b/src/commands/fusemount/telemetry.rs
+@@ -5,10 +5,11 @@
+ //! SIGINFO (FreeBSD) / SIGUSR2 dump of the live accounting and counters,
+ //! written to the daemon's stderr log (BCACHEFS_FUSE_LOG in daemon mode)
+ //! and to siginfo-latest.txt in the ring dir (stderr is /dev/null under
+-//! daemon(8) without the opt-in log); SIGUSR1 kicks reconcile (the port's
+-//! sysfs fd is a placeholder, so the sysfs trigger is unreachable) and
+-//! SIGWINCH requests a full reconcile scan; and the periodic snapshot
+-//! ring: every 60s an accounting.json written
++//! daemon(8) without the opt-in log); SIGUSR1 requests the pending
++//! reconcile scan and kicks (the port's sysfs fd is a placeholder, so
++//! the sysfs trigger is unreachable), and SIGWINCH requests a full
++//! reconcile scan; and the periodic snapshot ring: every 60s an
++//! accounting.json written
+ //! atomically (tmp + rename) under /var/run/bcachefs-fuse/<uuid>/, with
+ //! timestamp, generation, pid and provenance - stale must look stale.
+ //!
+@@ -86,10 +87,13 @@
+     write_pipe_byte(PIPE_DUMP);
+ }
+ 
+-/// SIGUSR1: kick reconcile - the equivalent of writing the sysfs
+-/// internal/trigger_reconcile_wakeup trigger, which the port can't reach
+-/// (065 keeps the sysfs fd a /dev/null placeholder). Starts a pass now
+-/// instead of waiting for the write io clock's next threshold.
++/// SIGUSR1: pending reconcile scan + kick - the equivalent of the sysfs
++/// internal/trigger_reconcile_pending_wakeup trigger, which the port
++/// can't reach (065 keeps the sysfs fd a /dev/null placeholder). The
++/// pending phases only run with a pending-scan cookie, and nothing
++/// retries the pending list on its own (device/config events request
++/// it; freespace recovery does not) - so work parked in a full-target
++/// era waits forever without this trigger.
+ extern "C" fn kick_handler(_sig: c_int) {
+     write_pipe_byte(PIPE_KICK);
+ }
+@@ -344,12 +348,15 @@
+     ev
+ }
+ 
+-/// SIGUSR1's action, off the signal path: a plain kick. Same call the
+-/// sysfs trigger makes; harmless when there's nothing to do (one pass
+-/// over empty work btrees, then back to waiting).
++/// SIGUSR1's action, off the signal path: request the pending scan,
++/// which also kicks (wakeup=true). A btree transaction, which is why it
++/// runs here and not in the handler; harmless when nothing is parked
++/// (one pass over empty work btrees, then back to waiting).
+ fn kick_reconcile(fs: &Fs) {
+-    fs.reconcile_wakeup();
+-    eprintln!("bcachefs fuse: telemetry: SIGUSR1: reconcile kicked");
++    match fs.reconcile_pending_wakeup() {
++        Ok(()) => eprintln!("bcachefs fuse: telemetry: SIGUSR1: pending scan requested, reconcile kicked"),
++        Err(e) => eprintln!("bcachefs fuse: telemetry: SIGUSR1: pending scan failed: {:?}", e),
++    }
+ }
+ 
+ /// SIGWINCH's action, off the signal path: request the full scan. This is
