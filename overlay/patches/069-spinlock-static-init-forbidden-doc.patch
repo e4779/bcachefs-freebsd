@@ -1,0 +1,20 @@
+--- a/include/linux/spinlock_types.h
++++ b/include/linux/spinlock_types.h
+@@ -13,8 +13,15 @@
+  * permanent deadlock — the single FUSE reader wedged forever in
+  * six_unlock_ip -> six_lock_wakeup (core dump 2026-11-06). A true spinlock
+  * restores the kernel contract: waiters spin briefly instead of sleeping,
+- * so would-be deadlocks degenerate into bounded contention. A zero value is
+- * a valid unlocked FreeBSD pthread_spinlock (no INITIALIZER macro exists).
++ * so would-be deadlocks degenerate into bounded contention.
++ *
++ * STATIC initialization is FORBIDDEN: pthread_spinlock_t is a pointer on
++ * FreeBSD, zero = NULL handle, and pthread_spin_lock(NULL) fails EINVAL
++ * WITHOUT locking - a silent no-op lock (core 83736's crash class). Every
++ * raw_spinlock must come through raw_spin_lock_init(); waitqueue heads use
++ * pthread_mutex_t instead (patch 068: it has a real static initializer).
++ * The only static DEFINE_SPINLOCK in the tree (util.c bch2_bio_dirty_lock)
++ * is #ifdef __KERNEL__, dead in the userspace build.
+  */
+ typedef struct {
+ 	pthread_spinlock_t lock;
