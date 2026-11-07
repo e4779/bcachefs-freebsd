@@ -1,0 +1,297 @@
+--- a/src/commands/fusemount/telemetry.rs
++++ b/src/commands/fusemount/telemetry.rs
+@@ -3,8 +3,12 @@
+ //! Daemon-side telemetry for the FreeBSD FUSE port (P4 phase 0 + phase 1).
+ //!
+ //! SIGINFO (FreeBSD) / SIGUSR2 dump of the live accounting and counters,
+-//! written to the daemon's stderr log (BCACHEFS_FUSE_LOG in daemon mode);
+-//! and the periodic snapshot ring: every 60s an accounting.json written
++//! written to the daemon's stderr log (BCACHEFS_FUSE_LOG in daemon mode)
++//! and to siginfo-latest.txt in the ring dir (stderr is /dev/null under
++//! daemon(8) without the opt-in log); SIGUSR1 kicks reconcile (the port's
++//! sysfs fd is a placeholder, so the sysfs trigger is unreachable) and
++//! SIGWINCH requests a full reconcile scan; and the periodic snapshot
++//! ring: every 60s an accounting.json written
+ //! atomically (tmp + rename) under /var/run/bcachefs-fuse/<uuid>/, with
+ //! timestamp, generation, pid and provenance - stale must look stale.
+ //!
+@@ -32,6 +36,8 @@
+ use bch_bindgen::c;
+ use bcachefs_kernel::accounting;
+ use bcachefs_kernel::fs::Fs;
++use bcachefs_kernel::init::passes;
++use bcachefs_kernel::util::printbuf::Printbuf;
+ use bcachefs_kernel::util::rcu;
+ use serde_json::{json, Map, Value};
+ 
+@@ -53,18 +59,49 @@
+ /// SIGUSR2's default is to kill. Both are repurposed here as "dump
+ /// telemetry": SIGINFO is the FreeBSD-native status key (ctrl-T), SIGUSR2
+ /// exists everywhere and is what a test script can raise(2).
+-extern "C" fn siginfo_handler(_sig: c_int) {
+-    // Async-signal-safe: write(2) only. A full pipe (64K pending dumps)
+-    // returns EAGAIN and the byte is dropped - dumps coalesce, which is
+-    // what we want. The fd is never closed, so it can't be recycled under
+-    // us; the load is a plain word read.
++/// Self-pipe bytes -> events: each signal writes one byte, the telemetry
++/// thread reads it back and does the work (see the module comment).
++const PIPE_DUMP: u8 = 1;
++const PIPE_KICK: u8 = 2;
++const PIPE_SCAN: u8 = 3;
++
++const EV_DUMP: u32 = 1;
++const EV_KICK: u32 = 2;
++const EV_SCAN: u32 = 4;
++
++/// Async-signal-safe: write(2) only. A full pipe (64K pending bytes)
++/// returns EAGAIN and the byte is dropped - signals coalesce, which is
++/// what we want. The fd is never closed, so it can't be recycled under
++/// us; the load is a plain word read.
++fn write_pipe_byte(byte: u8) {
+     let fd = SIGINFO_PIPE_W.load(Ordering::Relaxed);
+     if fd >= 0 {
+-        let b: u8 = 1;
+         unsafe {
+-            libc::write(fd, &b as *const u8 as *const libc::c_void, 1);
++            libc::write(fd, (&byte as *const u8).cast::<libc::c_void>(), 1);
+         }
+     }
++}
++
++extern "C" fn siginfo_handler(_sig: c_int) {
++    write_pipe_byte(PIPE_DUMP);
++}
++
++/// SIGUSR1: kick reconcile - the equivalent of writing the sysfs
++/// internal/trigger_reconcile_wakeup trigger, which the port can't reach
++/// (065 keeps the sysfs fd a /dev/null placeholder). Starts a pass now
++/// instead of waiting for the write io clock's next threshold.
++extern "C" fn kick_handler(_sig: c_int) {
++    write_pipe_byte(PIPE_KICK);
++}
++
++/// SIGWINCH: request a full reconcile scan - what the one-shot
++/// set_fs_needs_reconcile recovery pass does. Re-triages every extent, so
++/// it's the only path that reaches work inherited from before this mount
++/// (triggers only queue work for extents they see updated). Heavy: a full
++/// extents walk, executed by the reconcile thread at its own pace - which
++/// is why it's a deliberate operator signal, not automatic.
++extern "C" fn scan_handler(_sig: c_int) {
++    write_pipe_byte(PIPE_SCAN);
+ }
+ 
+ /// Install the SIGINFO/SIGUSR2 handlers. Idempotent; returns false (and
+@@ -98,6 +135,20 @@
+     if unsafe { libc::sigaction(libc::SIGUSR2, &act, std::ptr::null_mut()) } != 0 {
+         ok = false;
+     }
++    // SIGUSR1 (reconcile kick) and SIGWINCH (full reconcile scan): benign
++    // defaults (terminate / ignore), and repurposing them gives the port
++    // the operator triggers sysfs would otherwise carry.
++    let mut trig: libc::sigaction = unsafe { std::mem::zeroed() };
++    trig.sa_sigaction = kick_handler as libc::sighandler_t;
++    unsafe { libc::sigemptyset(&mut trig.sa_mask) };
++    trig.sa_flags = libc::SA_RESTART;
++    if unsafe { libc::sigaction(libc::SIGUSR1, &trig, std::ptr::null_mut()) } != 0 {
++        ok = false;
++    }
++    trig.sa_sigaction = scan_handler as libc::sighandler_t;
++    if unsafe { libc::sigaction(libc::SIGWINCH, &trig, std::ptr::null_mut()) } != 0 {
++        ok = false;
++    }
+     if !ok {
+         // Leave the fds installed but unwired: the handlers may still have
+         // been half-installed, and the pipe is harmless either way.
+@@ -245,8 +296,16 @@
+             break;
+         }
+         if n > 0 && polls[0].revents & libc::POLLIN != 0 {
+-            drain(rfd);
+-            dump(fs, &cfg.mountpoint, &cfg.devs);
++            let ev = drain(rfd);
++            if ev & EV_DUMP != 0 {
++                dump(fs, cfg);
++            }
++            if ev & EV_KICK != 0 {
++                kick_reconcile(fs);
++            }
++            if ev & EV_SCAN != 0 {
++                request_full_scan(fs);
++            }
+         }
+         if Instant::now() >= next {
+             // advance from the schedule, not from "now", so the ring
+@@ -260,8 +319,10 @@
+     }
+ }
+ 
+-/// Empty the pipe: many pending SIGINFOs are one dump.
+-fn drain(rfd: libc::c_int) {
++/// Empty the pipe and say what came: many pending signals of one kind
++/// are one event, a burst mixes kinds - each distinct byte is one bit.
++fn drain(rfd: libc::c_int) -> u32 {
++    let mut ev = 0u32;
+     let mut buf = [0u8; 64];
+     loop {
+         let n = unsafe { libc::read(rfd, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
+@@ -270,10 +331,37 @@
+             // EAGAIN (drained) or EINTR (treat as drained - the next
+             // signal re-fills the pipe).
+             break;
++        }
++        for b in buf.iter().take(n as usize) {
++            ev |= match *b {
++                PIPE_DUMP => EV_DUMP,
++                PIPE_KICK => EV_KICK,
++                PIPE_SCAN => EV_SCAN,
++                _ => 0,
++            };
+         }
+     }
++    ev
+ }
+ 
++/// SIGUSR1's action, off the signal path: a plain kick. Same call the
++/// sysfs trigger makes; harmless when there's nothing to do (one pass
++/// over empty work btrees, then back to waiting).
++fn kick_reconcile(fs: &Fs) {
++    fs.reconcile_wakeup();
++    eprintln!("bcachefs fuse: telemetry: SIGUSR1: reconcile kicked");
++}
++
++/// SIGWINCH's action, off the signal path: request the full scan. This is
++/// a btree transaction (the reconcile_scan btree's cookie), which is why
++/// it runs here and not in the handler.
++fn request_full_scan(fs: &Fs) {
++    match fs.request_scan(c::reconcile_scan::fs(), true) {
++        Ok(()) => eprintln!("bcachefs fuse: telemetry: SIGWINCH: full reconcile scan requested"),
++        Err(e) => eprintln!("bcachefs fuse: telemetry: SIGWINCH: scan request failed: {:?}", e),
++    }
++}
++
+ /// The reconcile accounting types, in BCH_RECONCILE_ACCOUNTING order (the
+ /// xmacro in fs/data/reconcile/format.rs); the dump's short names.
+ const RECONCILE_TYPES: [(&str, u32); 8] = [
+@@ -409,6 +497,17 @@
+     (capacity, used, capacity.wrapping_sub(used))
+ }
+ 
++/// Run one of the fs's to_text status renderers into an owned string.
++/// These are the sysfs attrs' own paths (reconcile_status,
++/// reconcile_scan_pending, recovery_status): read-only, self-guarded and
++/// short; the port's sysfs is a placeholder, so the ring and the dump are
++/// where they have to live.
++fn status_text(f: impl FnOnce(&mut Printbuf)) -> String {
++    let mut pb = Printbuf::new();
++    f(&mut pb);
++    pb.as_str().trim().to_string()
++}
++
+ /// The snapshot ring write: /var/run/bcachefs-fuse/<uuid>/accounting.json,
+ /// atomically (same-dir tmp + rename). One mem_read pass up front
+ /// (collect_entries); no locks, and nothing borrowed from the fs by the
+@@ -452,6 +551,13 @@
+ 
+     let (capacity, used, free) = usage_short_external(fs);
+ 
++    // The phase-0 audit additions: why the background threads are (not)
++    // draining - the reconcile thread's own status and the recovery
++    // runner's, same renderers the sysfs attrs use.
++    let recon_status = status_text(|out| fs.reconcile_status_to_text(out));
++    let scan_pending = status_text(|out| fs.reconcile_scan_pending_to_text(out));
++    let recovery_status = status_text(|out| passes::status_to_text(fs, out));
++
+     let mut doc = Map::new();
+     // Stale must look stale: ts is the wall clock of the last write, gen
+     // counts writes within this mount, pid says which daemon.
+@@ -473,6 +579,9 @@
+     doc.insert("compression_total".into(), json!(compression));
+     doc.insert("nr_inodes".into(), json!(nr_inodes[0]));
+     doc.insert("rebalance_work".into(), json!(rebalance[0]));
++    doc.insert("reconcile_status".into(), json!(recon_status));
++    doc.insert("scan_pending".into(), json!(scan_pending));
++    doc.insert("recovery_status".into(), json!(recovery_status));
+     doc.insert("counters".into(), json!(counters));
+     doc.insert("top".into(), Value::Array(top_json));
+ 
+@@ -490,17 +599,22 @@
+     }
+ }
+ 
+-/// The SIGINFO dump: one summary line of the interesting accounting, then
+-/// the nonzero persistent counters; at most 64 lines in all.
+-fn dump(fs: &Fs, mountpoint: &str, devs: &[String]) {
++/// The SIGINFO dump: one summary line of the interesting accounting,
++/// then reconcile/recovery status, then the nonzero persistent counters;
++/// at most 64 lines in all. Written to stderr AND to
++/// siginfo-latest.txt in the ring dir: stderr is /dev/null under
++/// daemon(8) unless the opt-in log is set, which made the dump unreadable
++/// exactly when it's needed.
++fn dump(fs: &Fs, cfg: &Cfg) {
+     // One-line summary: the P4 phase 0 gate question is whether
+     // reconcile_work is live at all under production load.
+     let entries = collect_entries(fs);
++    let mut lines: Vec<String> = Vec::new();
+     let mut line = format!(
+         "bcachefs-fuse[{}] {} dev[{}] SIGINFO:",
+         std::process::id(),
+-        mountpoint,
+-        devs.join(":")
++        cfg.mountpoint,
++        cfg.devs.join(":")
+     );
+     for e in entries.iter() {
+         line.push(' ');
+@@ -515,8 +629,18 @@
+             line.push_str(&v.to_string());
+         }
+     }
+-    eprintln!("{}", line);
++    lines.push(line);
+ 
++    // Why reconcile isn't draining, in one place: the thread's own status
++    // (waiting on the write io clock? running which phase?), whether a
++    // scan is pending, and where recovery stands.
++    lines.push(format!("reconcile_status: {}",
++        status_text(|out| fs.reconcile_status_to_text(out))));
++    lines.push(format!("scan_pending: {}",
++        status_text(|out| fs.reconcile_scan_pending_to_text(out))));
++    lines.push(format!("recovery_status: {}",
++        status_text(|out| passes::status_to_text(fs, out))));
++
+     // Counters: nonzero ones only, wrapped at a few per line, bounded.
+     let mut printed = 1;
+     'outer: for chunk in (0..c::BCH_COUNTER_NR as usize).step_by(6) {
+@@ -530,11 +654,31 @@
+             }
+         }
+         if any {
+-            eprintln!("{}", cline);
++            lines.push(cline);
+             printed += 1;
+             if printed >= 64 {
+                 break 'outer;
+             }
+         }
+     }
++
++    for l in lines.iter() {
++        eprintln!("{}", l);
++    }
++
++    // The durable copy: atomic, like the snapshots - an operator's
++    // kill -INFO must produce something greppable even with stderr
++    // discarded.
++    let dir = &cfg.dir;
++    let text = lines.join("\n") + "\n";
++    let result = (|| -> std::io::Result<()> {
++        std::fs::create_dir_all(dir)?;
++        let tmp = dir.join(".siginfo-latest.txt.tmp");
++        std::fs::write(&tmp, text.as_bytes())?;
++        std::fs::rename(&tmp, dir.join("siginfo-latest.txt"))?;
++        Ok(())
++    })();
++    if let Err(e) = result {
++        eprintln!("bcachefs fuse: telemetry: siginfo file: {}", e);
++    }
+ }
