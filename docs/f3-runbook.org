@@ -4,7 +4,14 @@
 
 Живой документ Ф3: пул (nda0p3:ada1, 4.7T, формат 1.39) смонтирован rw через FUSE-порт, прод-стек (stash/qbittorrent/amuled/amutorrent) работает на нём с 2026-11-06. Автозапуск: poolfuse → amuled → stash → qbittorrent → amutorrent (rcorder, svcj). Исторический журнал (до org-эры): docs/notes/19a-dogfood-engine.md.
 
-Текучка: демон rctl 8G (rule на pid), монитор /tmp/f3-monitor.sh (пересоздаётся после ребута — скрипт в tmp/), heartbeat tmp/f3-heartbeat.log. Rescue-рычаг при wedge: mount -u -o timeout=N /mnt/pool (переводит вечный redirty-цикл в фейлящиеся записи; fuse_vfsops.c:237 update path).
+* ПРОСТО ПОЛЬЗОВАТЬСЯ (шпаргалка владельца, 2026-11-07)
+Прод-стек (qbittorrent/amuled/stash/amutorrent) живёт на /mnt/pool, автозагрузка rcorder'ом, самооборона развёрнута. Ежедневный взгляд: /var/log/poolwatch/<current>/events.log (алармы) и кольцо /var/run/bcachefs-fuse/<uuid>/accounting.json (gen растёт = жив; reconcile_work.pend=0 = норма).
+Если что-то странное — почти ничего не нужно делать руками:
+- демон умер/завис → f3-heal сам bounce'ит за 2-3 мин (rc.d f3heal; лог tmp/f3-heal.log); вручную: doas service poolfuse onestop нет — просто doas umount -f /mnt/pool && doas service poolfuse onestart (демон выходит чисто, 070).
+- хочется заставить фон прямо сейчас → doas kill -USR1 <pid демона> (pending-scan+кик), kill -WINCH (полный скан), kill -INFO (мгновенный статус в siginfo-latest.txt).
+- ПЕРЕД плановыми работами с пулом: doas service f3heal onestop (иначе он вернёт маунт через 2 мин).
+Чего НЕ делать: freebsd-update вслепую — кернел-патчи fuse(4) (fuse_io fail-fast, fuse_ipc deadline-cap, overlay/patches/kernel/, воспроизводимы с 9218d0c/c426039) живут только в нашем /boot; гонять машины в память-своп (llama-класс: OOM убивает демона — f3-heal спасёт, но зачем); хранить cores навсегда (docs/evidence/*/bcachefs.core = 21.8ГБ суммарно — удалить после приёмки).
+Незакрытое мелкое: ребут с f3heal в цепи ещё не тестировался (первый плановый ребут = тест); P5 кернел-патчи не в апстриме; 070 не в koverstreet/fuser.
 
 
 * Council 2026-11-06: архитектурное решение по wedge (5 мест + синтез)
