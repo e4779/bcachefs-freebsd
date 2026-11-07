@@ -1,6 +1,8 @@
+diff --git a/fs/sb/io.rs b/fs/sb/io.rs
+index 17753ac4f..2e035ff58 100644
 --- a/fs/sb/io.rs
 +++ b/fs/sb/io.rs
-@@ -1386,7 +1386,7 @@
+@@ -1386,7 +1386,7 @@ fn read_super_and_backups(path: &CStr, opts: &mut c::bch_opts, err: &mut Printbu
      // narrows exactly the ro mount. The EACCES reopen below and
      // rewrite_primary_super() key off BLK_OPEN_WRITE and are unaffected
      // for read-write opens.
@@ -8,17 +10,19 @@
 +    if !opts.nochanges_or_default() {
          sb.dev.mode |= c::BLK_OPEN_WRITE;
      }
-     let open = |mode: c::blk_mode_t, holder: *mut c::bch_sb_handle_holder| {
+ 
+diff --git a/src/commands/fusemount.rs b/src/commands/fusemount.rs
+index d01c1b66a..e4938a36e 100644
 --- a/src/commands/fusemount.rs
 +++ b/src/commands/fusemount.rs
-@@ -1962,6 +1962,10 @@
+@@ -1962,6 +1962,10 @@ fn parse_fuse_mount_options(
      // filesystem-open concern - the latter isn't a mount flag, so set it here:
      if parsed.flags & ms::MS_RDONLY != 0 {
- 		bch_opts.set_read_only(true);
-+		// A read-only MOUNT never intends changes; nochanges keeps the
-+		// super-block fds O_RDONLY (see 057). fsck sets read_only WITHOUT
-+		// nochanges on purpose: it writes the clean bit on check-clean.
-+		bch_opts.set_nochanges(true);
+         bch_opts.set_read_only(true);
++        // A read-only MOUNT never intends changes; nochanges keeps the
++        // super-block fds O_RDONLY (see 057). fsck sets read_only WITHOUT
++        // nochanges on purpose: it writes the clean bit on check-clean.
++        bch_opts.set_nochanges(true);
      }
-     mount_options.extend(parsed.fuse_options);
  
+     mount_options.extend(parsed.fuse_options);

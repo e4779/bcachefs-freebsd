@@ -1,6 +1,11 @@
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@
+@@ -65,6 +73,7 @@
+ # unmount returns while the filesystem is still shutting down. Fixed on this
+ # branch (from v0.17.0); sent upstream - drop this once a release has it.
+ [patch.crates-io]
 -fuser = { git = "https://github.com/koverstreet/fuser", branch = "destroy-before-reply" }
 +# fuser = { git = "https://github.com/koverstreet/fuser", branch = "destroy-before-reply" }
 +fuser = { path = "fuser-vendored" }  # vendored: + writev reply-retry (F3 wedge class-3 fix)
+ # fs/'s, vendored for the kernel build: one copy, chrono's too.
+ num-traits = { path = "fs/vendor/num-traits" }
