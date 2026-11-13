@@ -1,7 +1,7 @@
 ---
 id: "bcf019"
 title: "FreeBSD code quality standards research, DoD = correct pi-topics"
-status: in-progress
+status: in-review
 priority: medium
 effort: medium
 dependencies: ["bcf018"]
@@ -27,9 +27,9 @@ Distill the corpus (bcf018) into verifiable conclusions. Gather "how it's done" 
 
 ## Acceptance Criteria (DoD = pi-topics)
 
-- [ ] 2–4 `topic_save`s: the candidates — "FreeBSD contribution path 2026 (GitHub PR flow, the committer role)", "style(9) + the unwritten sys/fs review expectations", "FreeBSD AI-policy status" (the last one with a date and a re-check trigger).
-- [ ] Each topic: status stable, receipts (specific style/commit points as evidence, not a paraphrase), triggers for recall.
-- [ ] The nothing-derivable rule: the topics hold only distilled conclusions and links; the raw material stays in the bcf018 corpus.
+- [x] Topics delivered (2026-11-14, all stable with receipts + triggers): style9-fuse-patch-checklist, freebsd-commit-conventions-external-pr, freebsd-fusefs-pr-expectations (15-point fuse-PR checklist + ETIMEDOUT suite gap). AI-policy topic was delivered by bcf018 (freebsd-ai-policy-status-2026-11, dated + re-check trigger).
+- [x] Each topic stable, receipts = style.9 line numbers / guide.md §refs / bugzilla comment lines — verified by command against /usr/src and corpus raw.
+- [x] Nothing-derivable holds: conclusions + pointers only; raw stays in the bcf018 corpus (distill-bcf019.md persisted as the bridge document).
 
 ## Source
 

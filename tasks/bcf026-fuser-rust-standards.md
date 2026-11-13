@@ -1,0 +1,45 @@
+---
+id: "bcf026"
+title: "Standards distillation: cberner/fuser (Rust side) → pi-topic"
+status: pending
+priority: high
+effort: medium
+type: chore
+dependencies: []
+tags: ["upstream", "fuser", "research", "knowledge"]
+created_at: 2026-11-14
+---
+
+# Standards distillation: cberner/fuser (Rust side) → pi-topic
+
+Boundary: the Rust userspace side of our port feeds cberner/fuser directly; this task distills its contribution norms into pi-topics. Kernel-side distillation is bcf019 (in flight) — sibling, not duplicate: no style(9) here, fuser has its own unwritten norms.
+
+## Objective
+
+Distill "how to write a mergeable PR for cberner/fuser". The Rust userspace side of our port feeds it: bcf014 (PR 070 reader-kick) is already aimed there, destroy-before-reply hardening (bcf022) will follow, and the nmount path goes via issue #29. Conventions differ from the kernel side — their norms, not ours.
+
+## Evidence to mine
+
+- Local vendored clone `fuser-vendored/` — the code style of the codebase we actually patch.
+- Corpus `raw/live-2026-11-14/closed100.jsonl` — external-PR merge stats (corrected: 11/29 merged, 38%).
+- Merged exemplars as ACCEPTED style samples: #643 (FreeBSD tests), #680 (BSD CI), #683, #695.
+- Rejected contrasts: #692 syncfs (self-landed as #738), #645, #688, #757 (third-party issue, zero comments).
+- Maintainer-tone topic facts (pi-topics bundle).
+- CI: #680 merged ⇒ a BSD CI gate exists — find what it runs.
+
+## Questions to answer
+
+- Code style rules of fuser: fmt/clippy config present? module layout (`session.rs`/`channel.rs`) — what patterns does a patch have to follow?
+- Test norms: how are upstream tests structured (e.g. the `drop_waits_for_destroy`-style session tests), and do PRs need tests to land?
+- PR framing that landed vs rejected: size, additive-vs-semantics framing, evidence attachment (perf numbers? repro scripts?).
+- CI gates: which checks run, and how does a FreeBSD-adjacent PR pass them?
+
+## Acceptance Criteria (DoD = pi-topics)
+
+- [ ] 1–2 stable pi-topics with receipts (file/line or API dump as evidence, not a paraphrase), triggers for recall set.
+- [ ] Nothing-derivable rule: topics hold distilled conclusions + pointers; raw material stays in the corpus.
+- [ ] A PR-writer checklist for bcf014, derivable from the topics.
+
+## Source
+
+maintainer-tone-fuser-fusefs-2026-11 topic + corpus closed100.jsonl; owner decision 2026-11-14 ("не только fusefs — есть ещё fuser").
