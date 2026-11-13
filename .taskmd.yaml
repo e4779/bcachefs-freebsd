@@ -1,0 +1,40 @@
+dir: ./tasks
+id:
+  strategy: prefixed
+  prefix: bcf
+scopes:
+  f3:
+    description: "F3 dogfood pool: poolfuse daemon ops, rc.d stack, f3-heal, prod bridge"
+    paths:
+      - "docs/"
+  fuser:
+    description: "fuser/FUSE port daemon-side code (vendored fork atop tools/)"
+    paths:
+      - "overlay/"
+      - "tools/"
+  overlay:
+    description: "overlay/ patches atop bcachefs-tools clone (incl. kernel patches)"
+    paths:
+      - "overlay/"
+  bench:
+    description: "bench/ measurement scripts vs NFS bridge baseline"
+    paths:
+      - "bench/"
+  scripts:
+    description: "scripts/ helpers (rlimit-run.sh etc.)"
+    paths:
+      - "scripts/"
+  docs:
+    description: "docs/ engineering notes, runbooks, evidence indexes"
+    paths:
+      - "docs/"
+  git:
+    description: "repo plumbing: hooks, taskmd scaffold, AGENTS.md"
+    paths:
+      - ".githooks/"
+      - ".taskmd.yaml"
+      - "AGENTS.md"
+  tasks:
+    description: "tasks/ store itself (taskmd migration, task bookkeeping)"
+    paths:
+      - "tasks/"
