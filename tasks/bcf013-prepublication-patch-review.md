@@ -6,6 +6,7 @@ priority: high
 effort: large
 type: chore
 tags: [review, overlay, upstream, kernel]
+dependencies: ["bcf018", "bcf019"]
 created_at: 2026-11-13
 context: [overlay/README.md, overlay/patches/, overlay/patches/kernel/, docs/f3-runbook.org]
 ---
@@ -21,6 +22,8 @@ context: [overlay/README.md, overlay/patches/, overlay/patches/kernel/, docs/f3-
 - **Свежий прогон цепочки** из восстановленных из git исходников перед отправкой (штамп-идемпотентность apply.sh — сверка).
 
 ## Метод
+
+Материал для ревью берётся из корпуса апстрим-практик (bcf018) и стандартов качества (bcf019 — без них ревью это вкус, а не критерии). Инструмент ревью — консилиум (bcf017, council-mode/места) — включатель, не блокер: в одиночку skeptic-верификатор тоже годен.
 
 Воркер не судит сам себя: ревью — отдельный взгляд (субагент-верификатор или вторая пара глаз владельца). Вердикты по каждому патчу — в git-журнал (коммиты с `Refs: bcf013`), найденные проблемы — фикс-коммитами до отправки PR.
 

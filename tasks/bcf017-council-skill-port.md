@@ -14,29 +14,28 @@ context: ["~/projects/pi-fabric/skillsets/python/fabric-council/SKILL.md"]
 
 ## Objective
 
-Перенести проверенный механику консилиума из fabric-эры в текущий контур (нативный pi, tool `subagent`, без fabric_exec/mesh). Владелец решением 2026-11-13: скилл живёт в pi-etc (свой репо — переживает обновления пакетов, в отличие от vendor-скиллов pi-subagents).
+Перенести механику консилиума из fabric-эры в текущий контур. Прокопано 2026-11-14: в pi-subagents (npm, vendor) УЖЕ есть скилл **council-mode** — протокол консилиума на нативном subagent. Слепой порт НЕ нужен; задача — сборка из двух половин и авторство мест.
 
-## Source material
+## Что уже есть (сравнение — см. журнальную запись 2026-11-14)
 
-- `~/projects/pi-fabric/skillsets/python/fabric-council/SKILL.md` (138 строк) и `.../typescript/fabric-council/SKILL.md` (191 строк).
-- Ценные механики, которые сохранить: 3–8 ролей с осмысленными разногласиями (не дубли-ревьюеры), роль = строка или {role, model, thinking}; независимые отчёты + best-effort синтез; паркинг отчётов (в fabric — mesh, runId-база, ifVersion=0 create-only, ретраи коллизий).
-- Записи прошлого консилиума по этому проекту: mesh council/2026-11-06-15-39-18/reports (см. bcf004).
+- **council-mode** (протокол): персистентные профили `council-*` (2–3, max 4), 3-pass cap, cross-exam через resume с курируемыми challenge-пакетами, родитель курирует claims (≤5 на место), строгий memo, pass-contracts outputSchema. НЕ хранит отчёты сам, НЕ умеет per-run model/thinking оверрайды (stance живёт в профиле).
+- **fabric-council** (py/ts, pi-fabric): 3–8 произвольных ролей per-run ({role, model, thinking}), mesh-паркинг отчётов (runId, ifVersion=0, ретраи), синтез отдельной моделью в одном fabric_exec.
+- **Старые места fabric-консилиума**: shell-lab-old/docs/council/council-seat-1..5.md — готовые stance'ы для профилей.
+- **На hlab сейчас**: ноль профилей `council-*` (только Explore/researcher/rust-coder/script-kiddie/skeptic) — council-mode уйдёт в fallback oracle/reviewer.
 
-## Adaptation (fabric → native pi)
+## Work
 
-- `agents.run`/`fabric_exec` → tool `subagent`: parallel workflow для мест, async для фоновых; синтез — отдельный шаг оркестратора (или llm-комплит).
-- mesh-паркинг → файлы: отчёты мест в `tmp/` (или `.pi/`), синтез в git-журнал/doks — как решит владелец.
-- Персоны/роли: project `.pi/agents/` + user `~/.pi/agent/agents/` (Explore, skeptic, researcher... — скилл pi-subagents описывает).
-- Имя без «fabric»: `council` (в pi-etc skills/). Frontmatter по правилам скилла skill-author (валидатор).
-- Ограничения текущего контура учесть: агентные бюджеты, без LLM-фонов вне workflow.
+- [ ] Авторство 2–4 профилей `council-*` (stance из старых seat'ов + AGENTS-персоны) — в user `~/.pi/agent/agents/` или pi-etc с установкой (решить; pi-etc переживает обновления npm).
+- [ ] Паркинг: fabric-механику mesh (runId + ifVersion=0) перевести на файлы (`tmp/council/<ts>/`), или принять, что council-mode достаточно (run id'ы в memo) — по итогам сухого прогона.
+- [ ] Если council-mode не покрывает per-run model/thinking оверрайды — расширить profiles или скилл-обвязку в pi-etc (НЕ форк npm-пакета).
+- [ ] Записка в pi-etc: когда консилиум, когда одиночный skeptic (всякая проверка — не консилиум); связка с bcf013.
 
 ## Acceptance Criteria
 
-- [ ] Скилл `pi-etc/skills/council/SKILL.md` проходит валидатор skill-author.
-- [ ] Сухой прогон: консилиум из 3 ролей на тестовом вопросе — отчёты мест + синтез, всё через нативный subagent, ни одного fabric-артефакта.
-- [ ] Записка в скилле: когда council, а когда одиночный skeptic/верификатор (не всякая проверка — консилиум).
-- [ ] Связь с bcf013 упомянута: места ревью могут зваться этим скиллом.
+- [ ] Консилиум 3 мест на тестовом вопросе проходит по протоколу council-mode: pass1 receipts, cross-exam, memo с run id'ами.
+- [ ] Профили мест переживут обновление pi-subagents (не в vendor-каталоге).
+- [ ] Профильтр+записка закоммичены в pi-etc.
 
 ## Source
 
-Решение владельца 2026-11-13 («раньше пользовал fabric-council, перенеси в pi-etc и адаптируй под текущий сетап»).
+Решение владельца 2026-11-13 («раньше пользовал fabric-council, перенеси в pi-etc и адаптируй»), уточнено 2026-11-14 после сравнения с council-mode.
