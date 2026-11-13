@@ -1,0 +1,143 @@
+#!/bin/sh
+# commit-msg — commit discipline for this repo (AGENTS.md "Worklog in git", Conventional Commits v1.0.0).
+#
+# Rejects (stderr, exit 1):   commit-msg: REJECT R<n>: <what and how to fix>
+# Soft warnings (exit 0):     commit-msg: WARN R<n>: ...
+#   R1 subject 'type(scope): description' — types fixed list; scope whitelist
+#      parsed AT RUNTIME from .taskmd.yaml scopes (single source). Unknown
+#      scope = WARN; whitelist parse failure = fail-open WARN (tooling
+#      breakage never blocks commits).
+#   R2 subject <= 72 chars (multibyte-aware: C.UTF-8 probed via locale -a,
+#      else the inherited locale — foreign clones must not byte-count).
+#   R3 staged diff empty <=> type ops. ops must be empty (--allow-empty);
+#      an empty non-ops commit is a hard reject on unborn HEAD, and a loud
+#      WARN otherwise — with HEAD present, commit-msg cannot distinguish a
+#      fresh empty commit from a mechanical --amend (git exposes no amend
+#      signal), so the ambiguous case is allowed with a warning. The ops
+#      branch itself (non-empty ops) is always a hard reject.
+#   R4 ops commits REQUIRE 'Refs: bcf-NNN...' git trailer in the FINAL
+#      paragraph — validated via git interpret-trailers --parse, the same
+#      view 'git log --format=%(trailers)' reads; comma list tolerated.
+#   R5 ops commits REQUIRE 'Context: ...' and 'Rollback: ...' trailers in
+#      the final paragraph.
+#   R6 non-ops commit without Refs trailer = WARN only.
+#   R7 body line > 100 chars = WARN.
+#   R8 obvious token patterns in ADDED lines and in the message itself
+#      (ops commits have no diff — the message is the only leak surface).
+#
+# Wire (one-time per clone; .git/config is untracked):
+#   git config core.hooksPath .githooks
+# Syntax check: sh -n .githooks/commit-msg
+
+set -u
+
+reject() { echo "commit-msg: REJECT $1: $2" >&2; exit 1; }
+warn()   { echo "commit-msg: WARN $1: $2" >&2; }
+
+[ "${1:-}" ] || reject R1 "no message file argument — hook is called as: commit-msg <msgfile>"
+msgfile=$1
+[ -f "$msgfile" ] || reject R1 "message file not found: $msgfile"
+
+# git strips comment lines itself (core.commentChar, default '#'); validate
+# the same view of the message
+cc=$(git config --get core.commentChar 2>/dev/null || echo '#')
+case $cc in auto | '#' | ';' | [A-Za-z0-9]) ;; *) cc='#' ;; esac
+lines=$(sed "/^[$cc]/d" "$msgfile")
+subject=$(printf '%s\n' "$lines" | sed -n '1p')
+rest=$(printf '%s\n' "$lines" | sed -n '2,$p')
+[ -n "$subject" ] || reject R1 "empty subject — use 'type(scope): imperative description'"
+
+# git-native trailer view of the message (final paragraph only). Trailer
+# rules validate THIS, not a body-anywhere grep: a mid-body 'Refs:' line is
+# invisible to 'git log --format=%(trailers)' readers and must not pass.
+trailers=$(printf '%s\n' "$lines" | git interpret-trailers --parse 2>/dev/null)
+
+# R1 subject shape (types fixed; scope advisory below)
+types='feat|fix|chore|docs|ops|refactor|revert|test|perf|build|ci'
+printf '%s\n' "$subject" | grep -Eq "^($types)(\([a-z0-9-]+\))?!?: .+" \
+  || reject R1 "subject must match 'type(scope): description' — types: feat fix chore docs ops refactor revert test perf build ci"
+type=$(printf '%s\n' "$subject" | sed -E "s/^($types)(\([a-z0-9-]+\))?!?: .+/\1/")
+scope=$(printf '%s\n' "$subject" | sed -En 's/^[a-z]+\(([^)]+)\)?.*/\1/p')
+
+# R1 scope whitelist — runtime-parsed from .taskmd.yaml scopes block (2-space
+# keys); inline '# comments' stripped first so a commented value cannot
+# silently drop its scope from the whitelist
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root=.
+scopes=$(sed 's/[[:space:]]*#.*//' "$root/.taskmd.yaml" 2>/dev/null \
+  | awk '/^scopes:/{f=1;next} f&&/^[^ ]/{exit} f&&/^  [A-Za-z0-9_-]+:$/{s=$1;sub(/:$/,"",s);print s}' \
+  | paste -sd '|' -)
+if [ -n "$scopes" ]; then
+  if [ -n "$scope" ] && ! printf '%s' "$scope" | grep -Eq "^($scopes)$"; then
+    warn R1 "scope '$scope' is not in .taskmd.yaml scopes ($scopes) — rename the scope or add the domain there"
+  fi
+else
+  warn R1 "could not parse scopes from .taskmd.yaml — scope whitelist skipped (fail-open)"
+fi
+
+# multibyte width: C.UTF-8 makes wc -m and grep '.' count CHARS, not bytes.
+# Probe for it once; fall back to the inherited locale (macOS/musl lack
+# C.UTF-8 and ignore LC_ALL=C.UTF-8 silently -> byte counts -> false rejects).
+u=${LC_ALL:-${LC_CTYPE:-${LANG:-}}}
+case $(locale -a 2>/dev/null) in *C.UTF-8*) u=C.UTF-8 ;; esac
+
+# R2 subject <= 72 chars
+slen=$(printf '%s' "$subject" | LC_ALL=$u wc -m | tr -d ' ')
+[ -n "$slen" ] && [ "$slen" -le 72 ] \
+  || reject R2 "subject is ${slen:-?} chars (max 72) — shorten it"
+
+# R3 staged diff empty <=> type ops (both directions)
+if git -C "$root" diff --cached --quiet >/dev/null 2>&1; then empty=yes; else empty=no; fi
+if [ "$type" = ops ]; then
+  [ "$empty" = yes ] || reject R3 "ops commits are journal entries — stage nothing (git commit --allow-empty)"
+  # R4 Refs trailer required (hard); comma lists tolerated
+  printf '%s\n' "$trailers" | grep -Eq '^Refs: bcf-[0-9]{3,}(, bcf-[0-9]{3,})*[[:space:]]*$' \
+    || reject R4 "ops commit requires 'Refs: bcf-NNN' trailer in the final paragraph (multiple: 'Refs: bcf-001, bcf-002')"
+  # R5 Context + Rollback trailers required
+  printf '%s\n' "$trailers" | grep -Eq '^Context: .+' \
+    || reject R5 "ops commit requires a 'Context: <why>' trailer in the final paragraph"
+  printf '%s\n' "$trailers" | grep -Eq '^Rollback: .+' \
+    || reject R5 "ops commit requires a 'Rollback: <how>' trailer in the final paragraph"
+else
+  if [ "$empty" = yes ]; then
+    # commit-msg has no amend signal; approximate one: HEAD exists, the index
+    # tree still equals HEAD's tree (nothing newly staged) and the message
+    # was edited — that is a mechanical --amend of HEAD, not a fresh empty
+    # commit. WARN keeps the R8 secret scan live (--no-verify stays out of
+    # the loop). This WARN also fires for a genuinely fresh empty non-ops
+    # commit — git gives commit-msg no way to tell the two apart (see the
+    # R3 header note); on an unborn branch (no HEAD) this stays a hard
+    # reject.
+    amend=no
+    if git -C "$root" rev-parse --verify -q HEAD >/dev/null 2>&1; then
+      wt=$(git -C "$root" write-tree 2>/dev/null) || wt=
+      ht=$(git -C "$root" rev-parse 'HEAD^{tree}' 2>/dev/null) || ht=
+      oldmsg=$(git -C "$root" log -1 --format=%B 2>/dev/null) || oldmsg=
+      [ -n "$wt" ] && [ -n "$ht" ] && [ "$wt" = "$ht" ] \
+        && [ -n "$oldmsg" ] && [ "$lines" != "$oldmsg" ] && amend=yes
+    fi
+    if [ "$amend" = yes ]; then
+      warn R3 "clean tree + edited message looks like a mechanical --amend of HEAD — allowed (a new empty commit still requires 'ops(area): ...' via --allow-empty)"
+    else
+      reject R3 "empty staged diff requires an ops journal commit ('ops(area): ...' via git commit --allow-empty)"
+    fi
+  fi
+  # R6 Refs footer soft-warn for work commits
+  printf '%s\n' "$trailers" | grep -Eq '^Refs: bcf-[0-9]{3,}' \
+    || warn R6 "no 'Refs: bcf-NNN' trailer in the final paragraph — add it if this commit advances a task"
+fi
+
+# R7 body lines <= 100 chars (warn only)
+nlong=$(printf '%s\n' "$rest" | LC_ALL=$u grep -cE '.{101}' || true)
+[ "${nlong:-0}" -gt 0 ] && warn R7 "$nlong body line(s) exceed 100 chars — wrap for readable git log"
+
+# R8 obvious secrets in ADDED lines and in the message itself (soft; hard
+# gate belongs to gitleaks later). Draft patterns restored alongside the
+# assignment regex: AWS key ids, PEM key blocks, GitHub token prefixes.
+secret_re="(api[_-]?key|secret|token|password)[[:space:]]*[=:][[:space:]]*['\"]?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}"
+leak=no
+if git -C "$root" diff --cached -U0 2>/dev/null | grep '^[+]' | grep -v '^[+][+][+]' \
+   | grep -Eqi "$secret_re"; then leak=yes; fi
+if printf '%s\n' "$lines" | grep -Eqi "$secret_re"; then leak=yes; fi
+[ "$leak" = yes ] && warn R8 "credential-shaped line(s) in staged diff or commit message — keep secrets out of git; hard gate: gitleaks later"
+
+exit 0
