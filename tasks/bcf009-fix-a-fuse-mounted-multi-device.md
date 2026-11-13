@@ -18,4 +18,4 @@ fusemount.rs:2340-2375 сверяет f_mntfromname с одиночным пут
 
 ## Source
 
-docs/f3-runbook.org:52 — org-заголовок «DONE Fix A: fuse_mounted multi-device false-negative» (мигрировано 2026-11-13).
+docs/f3-runbook.org (журнал миграции org→taskmd; история: git log --grep 'Refs: bcf[0-9]+').

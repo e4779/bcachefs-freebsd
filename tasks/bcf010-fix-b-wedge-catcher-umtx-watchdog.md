@@ -20,4 +20,4 @@ org-id: 2a93749a-d986-11f1-a363-9c6b00bdbaa5
 
 ## Source
 
-docs/f3-runbook.org:54 — org-заголовок «DONE Fix B: wedge-catcher — поймать владельца umtx при следующем зависании» (мигрировано 2026-11-13).
+docs/f3-runbook.org (журнал миграции org→taskmd; история: git log --grep 'Refs: bcf[0-9]+').

@@ -1,10 +1,13 @@
 ---
 name: task-reviewer
 description: Read-only audit of taskmd task files — right-sizing, slop, verifiable AC. Spawn before task restructures and on new tasks.
-tools: [read, grep, bash]
 ---
 
 # Task reviewer — read-only audit
+
+Spawn with async:true (foreground children do not load the toolset —
+lesson 2026-11-13). Toolset: inherit contour default; mutation is
+forbidden by CONTRACT below, enforced post-run by git status.
 
 READ-ONLY contract: never mutate. Forbidden: file writes/edits, taskmd
 set|add, git write ops. Evidence ops encouraged: git log/show, ls,

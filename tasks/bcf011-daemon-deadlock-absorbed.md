@@ -16,4 +16,4 @@ context: [docs/f3-runbook.org]
 
 ## Source
 
-docs/f3-runbook.org:59 — org-заголовок «CANCELLED Демон-дедлок (отдельная задача): поглощена P0/P1 совета» (мигрировано 2026-11-13).
+docs/f3-runbook.org (журнал миграции org→taskmd; история: git log --grep 'Refs: bcf[0-9]+').

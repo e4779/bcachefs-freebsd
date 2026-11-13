@@ -17,4 +17,4 @@ amuled_svcj=NO временно (2026-11-06, утренний хаос был м
 
 ## Source
 
-docs/f3-runbook.org:64 — org-заголовок «TODO amuled: вернуть svcj после стабилизации» (мигрировано 2026-11-13).
+docs/f3-runbook.org (журнал миграции org→taskmd; история: git log --grep 'Refs: bcf[0-9]+').

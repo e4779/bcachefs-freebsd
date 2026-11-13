@@ -23,4 +23,4 @@ cancelled_at: 2026-11-13
 
 ## Source
 
-docs/f3-runbook.org:66 — org-заголовок «WAITING Linux-кросс-валидация наших rw-записей» (мигрировано 2026-11-13).
+docs/f3-runbook.org (журнал миграции org→taskmd; история: git log --grep 'Refs: bcf[0-9]+').

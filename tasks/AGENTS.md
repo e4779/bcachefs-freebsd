@@ -132,8 +132,12 @@ right-sizing (one task = one testable deliverable), anti-slop
 real-gating deps.
 
 ```bash
-subagent({agent:"task-reviewer", task:"Review tasks/bcf[0-9]*.md. Return contract JSON."})
+subagent({agent:"task-reviewer", async:true, task:"Review tasks/bcf[0-9]*.md. Return contract JSON."})
 ```
+
+Run with `async: true` — foreground children do not load the toolset
+(lesson 2026-11-13: profile tools allowlist stays unavailable in
+foreground; background inherits the contour default).
 
 Post-run falsifier: `git status --porcelain tasks/` must be empty —
 the reviewer never mutates. It audits facts with commands and shows

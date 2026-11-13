@@ -17,7 +17,7 @@ created_at: 2026-11-13
 
 ## Tasks
 
-- [ ] При wedge: procstat -k демона ДО любого ресета (scar-рецепт из AGENTS).
+- [ ] При wedge: procstat -k демона ДО любого ресета (рецепт: scripts/wedge-catcher.sh — kill -5→core→lldb).
 - [ ] kill -INFO демона + снапшот ring (/var/run/bcachefs-fuse/).
 - [ ] Probe daemon-alive: локальный запрос через маунт + webui ответ.
 - [ ] Вердикт — ops-коммитом в рунбук (Refs: bcf023).

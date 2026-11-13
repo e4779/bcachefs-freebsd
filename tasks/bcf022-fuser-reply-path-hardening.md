@@ -17,6 +17,7 @@ Reply-path переживает смерть клиента и медленны�
 
 ## Tasks
 
+- [ ] Проверить: destroy-before-reply возможно УЖЕ в vendored (Cargo pins @8819589) — не портировать то, что есть.
 - [ ] Перенести destroy-before-reply из ветки форка, сверить с fuser#757.
 - [ ] writev bounded retry в channel.rs.
 - [ ] Reply-registry/watchdog/reader-heartbeat в session.rs.
