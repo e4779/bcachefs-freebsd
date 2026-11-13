@@ -1,6 +1,6 @@
 ---
 id: "bcf005"
-title: "P5: кернел-патчи fuse_io/fuse_ipc в апстрим freebsd-src"
+title: "P5: kernel patches fuse_io/fuse_ipc upstream to freebsd-src"
 status: pending
 priority: high
 effort: medium
@@ -11,21 +11,21 @@ created_at: 2026-11-13
 context: [docs/f3-runbook.org, overlay/patches/kernel/]
 ---
 
-# P5: кернел-патчи fuse_io/fuse_ipc в апстрим freebsd-src
+# P5: kernel patches fuse_io/fuse_ipc upstream to freebsd-src
 
-Оба патча живут в overlay/patches/kernel/ (воспроизводимо с 9218d0c/c426039):
-- fuse_io-etimedout-fail-fast.patch — ETIMEDOUT на записи не должен молча ретраиться вечно (redirty-цикл)
-- fuse_ipc-deadline-cap.patch — PCATCH msleep перезапускался с новым окном на каждый периодический сигнал (форма-4 wedge: поток никогда не видел ETIMEDOUT)
-Путь: PR на github.com/freebsd/freebsd-src (или reviews.freebsd.org).
-До отправки: сверить с текущим main fuse_ipc.c/fuse_io.c (наш /usr/src 15.1), приложить репродюс/обоснование из журнала (форма-4, стеки из китов), текст — по скиллу opensource-contribution (без AI-slop, evidence-first). Проверить дубликаты про fuse EINTR wedges — единый владелец: bcf018 §6.
+Both patches live in overlay/patches/kernel/ (reproducible from 9218d0c/c426039):
+- fuse_io-etimedout-fail-fast.patch — ETIMEDOUT on a write must not be retried silently forever (redirty loop)
+- fuse_ipc-deadline-cap.patch — PCATCH msleep was restarted with a new window on every periodic signal (shape-4 wedge: the thread never saw ETIMEDOUT)
+Path: a PR to github.com/freebsd/freebsd-src (or reviews.freebsd.org).
+Before sending: verify against current main fuse_ipc.c/fuse_io.c (our /usr/src 15.1), attach the repro/justification from the journal (shape-4, stacks from cores), the text per the opensource-contribution skill (no AI-slop, evidence-first). Check for duplicates re fuse EINTR wedges — single owner: bcf018 §6.
 
 ## Acceptance Criteria
 
-- [ ] PR открыт на freebsd-src, номер записан в задачу (`taskmd set bcf005 --add-pr <url>`).
-- [ ] CI/фидбек мейнтейнера отслежен, правки отправлены. В описании PR — ссылка на проект https://github.com/e4779/bcachefs-freebsd (прод-догфудинг как мотивация). Партнёрский баг-репорт — bcf015.
+- [ ] PR opened on freebsd-src, the number recorded into the task (`taskmd set bcf005 --add-pr <url>`).
+- [ ] CI/maintainer feedback tracked, fixes sent. The PR description carries the project link https://github.com/e4779/bcachefs-freebsd (prod dogfooding as motivation). Companion bug report — bcf015.
 
-Корпус: docs/notes/upstream-corpus-2026-11-13/ + topics (freebsd-ai-policy-status-2026-11, freebsd-contribution-path-2026-11, maintainer-tone-fuser-fusefs-2026-11).
+Corpus: docs/notes/upstream-corpus-2026-11-13/ + topics (freebsd-ai-policy-status-2026-11, freebsd-contribution-path-2026-11, maintainer-tone-fuser-fusefs-2026-11).
 
 ## Source
 
-docs/f3-runbook.org:45 — org-заголовок «TODO P5: кернел-патчи в апстрим freebsd-src (sys/fs/fuse)» (мигрировано 2026-11-13).
+docs/f3-runbook.org:45 — org heading "TODO P5: kernel patches upstream to freebsd-src (sys/fs/fuse)" (ru: «TODO P5: кернел-патчи в апстрим freebsd-src (sys/fs/fuse)»; migrated 2026-11-13).

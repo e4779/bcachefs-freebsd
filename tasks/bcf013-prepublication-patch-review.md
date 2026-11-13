@@ -1,6 +1,6 @@
 ---
 id: "bcf013"
-title: "Предпубликационный ревью патчей порта: overlay 001–070 + кернел-патчи, гейт перед апстрим-PR"
+title: "Pre-publication review of the port patches: overlay 001–070 + kernel patches, gate before the upstream PR"
 status: pending
 priority: high
 effort: large
@@ -11,28 +11,28 @@ created_at: 2026-11-13
 context: [overlay/README.md, overlay/patches/, overlay/patches/kernel/, docs/f3-runbook.org]
 ---
 
-# Предпубликационный ревью патчей порта (гейт перед PR)
+# Pre-publication review of the port patches (gate before PR)
 
-Гейт качества: ни один патч не уходит в апстрим-PR (bcf005, bcf014) до независимого ревью. Публичный репозиторий https://github.com/e4779/bcachefs-freebsd уже виден миру — то, что мы отправляем наверх, становится лицом проекта.
+Quality gate: no patch goes into an upstream PR (bcf005, bcf014) before an independent review. The public repo https://github.com/e4779/bcachefs-freebsd is already visible to the world — what we send upstream becomes the face of the project.
 
-## Объём
+## Scope
 
-- **Кернел-патчи** (`overlay/patches/kernel/`, 2 шт): fuse_io-etimedout-fail-fast, fuse_ipc-deadline-cap. Ревью против семантики FreeBSD main (не только нашего /usr/src 15.1): не ломают ли легитимные ретраи, корректна ли работа с PCATCH/ETIMEDOUT, минимален ли дифф. Evidence из журнала (форма-4 wedge, стеки из китов) — готовится к приложению в bcf005.
-- **Демон-патчи 001–070** (overlay/patches + зеркала overlay/files): выборочно — всё, что войдёт в fuser-PR (070: channel.rs/session.rs, флаг Destroy-arm + реестр читателей + SIGURG) и всё, что заявлено в README репозитория. Критерии: нет отладочного мусора, нет мёртвого кода, патч самодостаточен и воспроизводим через apply.sh с чистого клона, комментарии честные (EN).
-- **Свежий прогон цепочки** из восстановленных из git исходников перед отправкой (штамп-идемпотентность apply.sh — сверка).
-- **Паритет-эвиденс (по требованию ревьюверов)**: кросс-валидация rw-записей против Linux — probe /mnt/pool/.f3-probe/f001-200mb.bin, сверка sha256 599b9472… с обеих сторон + fsck Linux-стороной (наследие отменённого bcf007; окружение — appliance или любая Linux-машина с bcachefs).
+- **Kernel patches** (`overlay/patches/kernel/`, 2 pcs): fuse_io-etimedout-fail-fast, fuse_ipc-deadline-cap. Review against FreeBSD main semantics (not only our /usr/src 15.1): do they break legitimate retries, is the PCATCH/ETIMEDOUT handling correct, is the diff minimal. Evidence from the journal (shape-4 wedge, stacks from cores) — being prepared for attachment in bcf005.
+- **Daemon patches 001–070** (overlay/patches + mirrors in overlay/files): selectively — everything that goes into the fuser PR (070: channel.rs/session.rs, the Destroy-arm flag + reader registry + SIGURG) and everything claimed in the repo README. Criteria: no debug debris, no dead code, the patch is self-contained and reproducible via apply.sh from a clean clone, comments honest (EN).
+- **A fresh run of the chain** from git-restored sources before sending (apply.sh stamp-idempotency — verify).
+- **Parity evidence (on reviewer demand)**: cross-validation of the rw writes against Linux — probe /mnt/pool/.f3-probe/f001-200mb.bin, verify sha256 599b9472… on both sides + fsck from the Linux side (legacy of the cancelled bcf007; environment — the appliance or any Linux machine with bcachefs).
 
-## Метод
+## Method
 
-Материал для ревью берётся из корпуса апстрим-практик (bcf018) и стандартов качества (bcf019 — без них ревью это вкус, а не критерии). Инструмент — council-mode с проектными местами council-* (bcf020): **обязательное предусловие гейта** — без мест гейт не открывается (решение владельца 2026-11-13: «как ревьювить, если ещё нечем»).
+The review material comes from the upstream-practices corpus (bcf018) and the quality standards (bcf019 — without them a review is taste, not criteria). The tool — council-mode with the project council-* seats (bcf020): a **mandatory precondition of the gate** — without seats the gate does not open (owner decision 2026-11-13: "how do you review when there is nothing to review with yet" (ru: «как ревьювить, если ещё нечем»)).
 
-Воркер не судит сам себя: ревью — отдельный взгляд (субагент-верификатор или вторая пара глаз владельца). Вердикты по каждому патчу — в git-журнал (коммиты с `Refs: bcf013`), найденные проблемы — фикс-коммитами до отправки PR.
+A worker does not judge itself: review is a separate look (a verifier subagent or the owner's second pair of eyes). Verdicts per patch go into the git journal (commits with `Refs: bcf013`), found problems — as fix commits before the PR is sent.
 
 ## Definition of done
 
-- По каждому патчу, входящему в PR-трек: вердикт «годен / правки / не отправляем» в журнале.
-- Все «правки» закрыты, дерево собирается, apply.sh гонится с чистого клона.
+- For every patch on the PR track: a verdict "fit / fixes / not sending" in the journal.
+- All "fixes" closed, the tree builds, apply.sh runs from a clean clone.
 
 ## Source
 
-Решение владельца 2026-11-13 (планирование трека публикации: PR-ы перед тредом на форумах FreeBSD, в PR-ах ссылка на проект).
+Owner decision 2026-11-13 (publication track planning: PRs before the FreeBSD forums thread, the PRs link to the project).

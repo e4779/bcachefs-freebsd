@@ -1,6 +1,6 @@
 ---
 id: "bcf001"
-title: "P1a: MT-фикс wedge — 8 потоков fuser"
+title: "P1a: MT wedge fix — 8 fuser threads"
 status: pending
 priority: high
 effort: large
@@ -9,27 +9,27 @@ tags: [port, wedge]
 created_at: 2026-11-13
 ---
 
-# P1a: MT-фикс wedge — 8 потоков fuser
+# P1a: MT wedge fix — 8 fuser threads
 
 ## Objective
 
-MT-билд (8 потоков) как база стабилизационного пакета P1: убрать однопоточную узость reply-path, где sync disk IO демона блокирует FUSE-ответы. Fact: core#2 (MT-билд, kill -5) показал fuser-0 в preadv на HDD — sync disk IO inline.
+The MT build (8 threads) as the base of stabilization package P1: remove the single-threaded narrowness of the reply-path, where the daemon's sync disk IO blocks FUSE replies. Fact: core#2 (MT build, kill -5) showed fuser-0 in preadv on the HDD — sync disk IO inline.
 
 ## Tasks
 
-- [ ] Подтвердить в коде fuser-vendored: gate 8 потоков снят, потоки реально стартуют.
-- [ ] Включить 8 потоков по умолчанию в прод-конфиге.
-- [ ] Acid-тест (qbt init) на тестовом пуле.
-- [ ] Прод-пул под f3-heal 24ч — наблюдение.
+- [ ] Confirm in the fuser-vendored code: the 8-thread gate is lifted, the threads actually start.
+- [ ] Enable 8 threads by default in the prod config.
+- [ ] Acid test (qbt init) on the test pool.
+- [ ] Prod pool under f3-heal for 24h — observation.
 
-Сборка — ТОЛЬКО в слоте оркестратора (правило AGENTS).
+Build — ONLY in the orchestrator slot (AGENTS rule).
 
 ## Acceptance Criteria
 
-- [ ] Acid-тест qbt init: 3 прогона подряд без wedge.
-- [ ] Прод 24ч: ноль инцидентов wedge в poolwatch.
-- [ ] Deadline-слой (watchdog/heartbeat) здесь ОТСУТСТВУЕТ — он в bcf022 (граница явная).
+- [ ] Acid test qbt init: 3 consecutive runs without a wedge.
+- [ ] Prod 24h: zero wedge incidents in poolwatch.
+- [ ] The deadline layer (watchdog/heartbeat) is NOT here — it lives in bcf022 (explicit boundary).
 
 ## Source
 
-Runbook 2026-11-06 консилиум (модель форм wedge); core#2 стеки.
+Runbook 2026-11-06 council (wedge shape model); core#2 stacks.

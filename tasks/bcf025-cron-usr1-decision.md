@@ -1,6 +1,6 @@
 ---
 id: "bcf025"
-title: "cron-USR1: автоматизация дренажа pending-scan — GO/NO-GO владельца"
+title: "cron-USR1: pending-scan drainage automation — owner GO/NO-GO"
 status: pending
 priority: medium
 effort: small
@@ -9,23 +9,23 @@ tags: [ops, decision]
 created_at: 2026-11-13
 ---
 
-# cron-USR1: автоматизация дренажа — GO/NO-GO владельца
+# cron-USR1: drainage automation — owner GO/NO-GO
 
 ## Objective
 
-Дренаж по SIGUSR1 подтверждён живьём (bcf012: 144М→18.8М секторов, ~240МБ/с), сейчас — только ручной `kill -USR1 <pid>`. Решение: вешать ли периодический pending-scan на cron. Это владельческое решение (риск-профиль прод-машины), не код.
+SIGUSR1 drainage is confirmed live (bcf012: 144M→18.8M sectors, ~240MB/s); currently manual `kill -USR1 <pid>` only. The decision: whether to put a periodic pending-scan on cron. This is an owner decision (the prod machine's risk profile), not code.
 
 ## Tasks
 
-- [ ] Директивы для решения: период (сутки? часы?), guard от шторма (один скан за раз), svcj-безопасность вызова, что пишется в лог.
-- [ ] GO: строка cron + запись в рунбук (ops-коммит).
-- [ ] NO-GO: запись в рунбук с причиной — вопрос закрыт, не реанимировать без нового инцидента.
+- [ ] The directives for the decision: the period (a day? hours?), a storm guard (one scan at a time), the svcj-safety of the invocation, what gets logged.
+- [ ] GO: a cron line + a runbook entry (an ops commit).
+- [ ] NO-GO: a runbook entry with the reason — the question is closed, do not revive without a new incident.
 
 ## Acceptance Criteria
 
-- [ ] В рунбуке записан вердикт GO (с cron-строкой) или NO-GO (с причиной).
-- [ ] При GO: первый сработавший скан виден в логе демона.
+- [ ] The runbook records the GO verdict (with the cron line) or NO-GO (with the reason).
+- [ ] On GO: the first fired scan visible in the daemon log.
 
 ## Source
 
-Выделено из bcf012 (2026-11-13, ревью таск-набора: другой тип деливерабла).
+Split out of bcf012 (2026-11-13, the task-set review: a different deliverable type).

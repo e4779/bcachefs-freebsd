@@ -1,6 +1,6 @@
 ---
 id: "bcf002"
-title: "P2: возврат отложенных сервисов после стабилизационного пакета (qbt, amuled svcj)"
+title: "P2: return of deferred services after the stabilization package (qbt, amuled svcj)"
 status: pending
 priority: medium
 effort: medium
@@ -9,24 +9,24 @@ tags: [ops, soak]
 created_at: 2026-11-13
 ---
 
-# P2: возврат отложенных сервисов после стабилизационного пакета (qbt, amuled svcj)
+# P2: return of deferred services after the stabilization package (qbt, amuled svcj)
 
 ## Objective
 
-После лендинга P1a (bcf001) + P3b (bcf024) вернуть на прод то, что снималось ради стабилизации. Жёсткий факт: перезапуск qbt = 3/3 livelock — премиса «retry-фикс поможет» не доказана до лендинга bcf001. f3-heal задеплоен и валидирован (факт, детали в git-журнале) — открытая часть задачи только возврат сервисов и sunset.
+After P1a (bcf001) + P3b (bcf024) land, return to prod what was removed for the sake of stabilization. Hard fact: a qbt restart = 3/3 livelock — the "retry fix will help" premise is unproven until bcf001 lands. f3-heal is deployed and validated (fact, details in the git journal) — the open part of the task is only the service return and the sunset.
 
 ## Tasks
 
-- [ ] qbt обратно в boot-цепь со staggered fastresume (bcf024).
-- [ ] amuled вернуть под svcj (поглощено из bcf006; автостарт).
-- [ ] Sunset-критерий f3-heal: сформулировать и записать.
+- [ ] qbt back into the boot chain with staggered fastresume (bcf024).
+- [ ] amuled back under svcj (absorbed from bcf006; autostart).
+- [ ] f3-heal sunset criterion: formulate and write it down.
 
 ## Acceptance Criteria
 
-- [ ] qbt 48ч: ноль wedge, poolwatch perr=0.
-- [ ] amuled работает jailed (svcj), переживает ребут.
-- [ ] Sunset f3-heal записан (предложение: 2 недели без инцидентов → снять или оставить — решение владельца).
+- [ ] qbt 48h: zero wedges, poolwatch perr=0.
+- [ ] amuled runs jailed (svcj), survives a reboot.
+- [ ] f3-heal sunset recorded (proposal: 2 weeks without incidents → remove or keep — owner's call).
 
 ## Source
 
-Runbook консилиум 2026-11-06; bcf006 (поглощена, cancelled).
+Runbook council 2026-11-06; bcf006 (absorbed, cancelled).

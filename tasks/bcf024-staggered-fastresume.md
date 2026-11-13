@@ -1,6 +1,6 @@
 ---
 id: "bcf024"
-title: "P3b: staggered fastresume qbt — разброс старта против close-шторма"
+title: "P3b: staggered qbt fastresume — spreading the start against the close-storm"
 status: pending
 priority: medium
 effort: medium
@@ -9,23 +9,23 @@ tags: [port, ops]
 created_at: 2026-11-13
 ---
 
-# P3b: staggered fastresume qbt
+# P3b: staggered qbt fastresume
 
 ## Objective
 
-Детерминированный close-шторм: 711 fastresume одновременно = волна close/release/forget (kit 092614). Разбросать старт торрентов по времени, чтобы пик запросов не совпадал.
+A deterministic close-storm: 711 fastresumes at once = a wave of close/release/forget (kit 092614). Spread the torrent starts over time so that the request peak does not coincide.
 
 ## Tasks
 
-- [ ] Механизм разброса: обёртка запуска qbt или сортировка fastresume-файлов (окно ~5-10 мин).
-- [ ] Прогон на тестовом пуле с полным fastresume.
-- [ ] Связка с возвратом qbt (bcf002): staggered — часть штатного запуска.
+- [ ] The spread mechanism: a qbt launch wrapper or an ordering of the fastresume files (a ~5-10 min window).
+- [ ] A run on the test pool with full fastresume.
+- [ ] The tie-in with the qbt return (bcf002): staggered is part of the standard launch.
 
 ## Acceptance Criteria
 
-- [ ] Перезапуск qbt с полным fastresume — ноль wedge.
-- [ ] poolwatch perr=0 за окно прогона.
+- [ ] A qbt restart with full fastresume — zero wedges.
+- [ ] poolwatch perr=0 over the run window.
 
 ## Source
 
-Runbook консилиум 2026-11-06 (Shape-1); kit 092614.
+Runbook council 2026-11-06 (Shape-1); kit 092614.

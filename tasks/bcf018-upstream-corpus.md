@@ -1,6 +1,6 @@
 ---
 id: "bcf018"
-title: "Корпус материалов для апстрим-контрибуций FreeBSD: ai-policy, путь контрибуции, требования к коду"
+title: "Corpus for FreeBSD upstream contributions: ai-policy, contribution path, code requirements"
 status: in-review
 priority: high
 effort: medium
@@ -10,32 +10,32 @@ created_at: 2026-11-13
 context: ["tasks/bcf005-p5-kernel-patches-upstream-freebsd.md", "tasks/bcf014-fuser-pr-070-reader-kick.md", "tasks/bcf016-freebsd-forum-thread.md"]
 ---
 
-# Корпус материалов для апстрим-контрибуций FreeBSD
+# Corpus for FreeBSD upstream contributions
 
-Граница с bcf019: эта задача = СОБРАТЬ (материалы, индекс, receipts-ссылки); дистилляция выводов в pi-topics = bcf019. Секции 3 и 5 — collect-only.
+Boundary with bcf019: this task = COLLECT (the material, the index, receipts links); distilling the conclusions into pi-topics = bcf019. Sections 3 and 5 are collect-only.
 
 ## Objective
 
-Собрать структурированный корпус, на который опираются тексты PR (bcf005, bcf014, bcf015) и тред на форумах (bcf016). **Место оседания — pi-topics** (решение владельца): дистиллированные выводы + receipts живут в topic-памяти; сырьё крупнее дайджеста — в librarian-кэш (remote git/docs) или файлы со ссылкой. Не линк-дамп: каждый материал — с датой съёма, местом и абзацем «зачем».
+Assemble a structured corpus that backs the PR texts (bcf005, bcf014, bcf015) and the forums thread (bcf016). **The settling place is pi-topics** (owner decision): the distilled conclusions + receipts live in topic memory; raw material larger than a digest — into the librarian cache (remote git/docs) or files with a link. Not a link dump: every item carries a capture date, a location, and a "why" paragraph.
 
 ## Sections to collect
 
-1. **AI-policy драфты FreeBSD** (рамка владельца: политика НЕ про запрет — это про процесс/прозрачность; фиксируем фактические требования и их статус на дату, влияет на оформление PR и треда): свежие драфты на wiki.freebsd.org / freebsd-src / lists, что требуется от контрибутора, прецеденты.
-2. **Путь контрибуции 2026**: freebsd-src на GitHub (PR-флоу для внешних), reviews.freebsd.org — жив ли Phabricator-путь, Documentation/Committer instructions для внешних, ожидания по MFC/HEAD.
-3. **Требования к коду**: style(9) (кернел-C — наш случай для fuse_io/fuse_ipc патчей), конвенции commit-сообщений src, ожидания по репродюсам/тестам (pjdfstest, KYUA?).
-4. **Наша bhyve-история как prior art**: патчи, которые мы уже приносили в bhyve. ВАЖНО: индекс памяти покрывает только горячие сессии 2026-11-11..13 — эра bhyve-контрибуций туда не попала. Копать: homelab docs/runbooks, форки freebsd-src на GitHub владельца, почта/архивы рассылок. Что нашли: формат, куда шли (Differential? рассылка?), что приняли/отклонили и почему.
-5. **Тон и практика конкретных мейнтейнеров/подсистем** (кормит место council-maintainer в bcf020): кто мейнтейнит sys/fs/fuse и koverstreet/fuser — тон прошлых обсуждений и реакция на внешние PR (fuser#757, cberner/fuser issue #29), что принимают/отклоняют и как аргументируют.
-6. **Дубли-проверка**: bugs.freebsd.org по fuse EINTR/wedge/timeout (нужно и bcf005 — объединить находки сюда).
+1. **FreeBSD AI-policy drafts** (the owner's frame: the policy is NOT about a ban — it is about process/transparency; we record the actual requirements and their status as of the date; this affects the PR and thread formatting): fresh drafts on wiki.freebsd.org / freebsd-src / lists, what is required from a contributor, precedents.
+2. **The contribution path 2026**: freebsd-src on GitHub (the PR flow for externals), reviews.freebsd.org — is the Phabricator path alive, Documentation/Committer instructions for externals, MFC/HEAD expectations.
+3. **Code requirements**: style(9) (kernel C — our case for the fuse_io/fuse_ipc patches), the src commit-message conventions, repro/test expectations (pjdfstest, KYUA?).
+4. **Our bhyve history as prior art**: the patches we already brought to bhyve. IMPORTANT: the memory index covers only the hot sessions of 2026-11-11..13 — the bhyve-contribution era did not make it in. Dig: homelab docs/runbooks, the owner's freebsd-src forks on GitHub, mailing-list mail/archives. What to find: the format, where it went (Differential? a mailing list?), what was accepted/rejected and why.
+5. **The tone and practice of specific maintainers/subsystems** (feeds the council-maintainer seat in bcf020): who maintains sys/fs/fuse and koverstreet/fuser — the tone of past discussions and the reaction to external PRs (fuser#757, cberner/fuser issue #29), what they accept/reject and how they argue it.
+6. **The duplicate check**: bugs.freebsd.org for fuse EINTR/wedge/timeout (bcf005 needs this too — merge the findings here).
 
 ## Acceptance Criteria
 
-- [x] Корпус осел: 4 pi-topics (ai-policy / contribution-path / bhyve-prior-art / maintainer-tone; receipts в каждом утверждении) + CORPUS.md как карта.
-- [x] Сырьё крупнее дайджеста — не в топиках: docs/notes/upstream-corpus-2026-11-13/raw/ (AI-гайд, Committer's Guide, отчёт Q3, D50650, GSOC, треды PR 300130/475/480, bz-снапшоты); в топиках — только ссылки.
-- [x] AI-policy: статус на дату + чек-пункт «перепроверить перед отправкой каждого PR» (topic freebsd-ai-policy-status-2026-11).
-- [x] bhyve-история: полный список (PR 300130/300475/300480 + nct668x prep) с датами/статусами/паттерном — topic freebsd-upstream-prior-art-bhyve-2026-11.
-- [x] Корпус сослан из bcf005/bcf014/bcf016 (строка «Корпус» в каждой).
-- [x] Дубли-секция §6: dup-sweep выполнен 2026-11-14 — dup = none (LIVE-ADDENDUM-2026-11-14.md §1; REST-обход multi-word задокументирован). Задача к приёмке владельцем.
+- [x] The corpus settled: 4 pi-topics (ai-policy / contribution-path / bhyve-prior-art / maintainer-tone; receipts in every claim) + CORPUS.md as the map.
+- [x] Raw material larger than a digest — not in the topics: docs/notes/upstream-corpus-2026-11-13/raw/ (the AI guide, the Committer's Guide, the Q3 report, D50650, GSOC, the PR 300130/475/480 threads, bz snapshots); in the topics — links only.
+- [x] AI-policy: the status as of the date + the checkpoint "re-verify before sending each PR" (topic freebsd-ai-policy-status-2026-11).
+- [x] The bhyve history: the full list (PR 300130/300475/300480 + the nct668x prep) with dates/statuses/pattern — topic freebsd-upstream-prior-art-bhyve-2026-11.
+- [x] The corpus referenced from bcf005/bcf014/bcf016 (a "Corpus" line in each).
+- [x] The duplicates section §6: the dup-sweep done 2026-11-14 — dup = none (LIVE-ADDENDUM-2026-11-14.md §1; the REST workaround for multi-word documented). The task is pending owner acceptance.
 
 ## Source
 
-Решение владельца 2026-11-13 («собрать хороший корпус: от драфтов ai-policy до требований к коду, стандарты качества»).
+Owner decision 2026-11-13 ("assemble a good corpus: from the ai-policy drafts to the code requirements, quality standards" (ru: «собрать хороший корпус: от драфтов ai-policy до требований к коду, стандарты качества»)).

@@ -1,6 +1,6 @@
 ---
 id: "bcf007"
-title: "Linux-кросс-валидация rw-записей порта (VM)"
+title: "Linux cross-validation of the port's rw writes (VM)"
 status: cancelled
 priority: low
 effort: medium
@@ -11,16 +11,16 @@ context: [docs/f3-runbook.org, bench]
 cancelled_at: 2026-11-13
 ---
 
-# Linux-кросс-валидация rw-записей порта (VM)
+# Linux cross-validation of the port's rw writes (VM)
 
-ОТМЕНЕНО 2026-11-13 (решение владельца): как отдельная задача — зомби. Суть перенесена в bcf013 (гейт перед апстрим-PR): паритет-эвиденс по требованию ревьюверов — probe-файл /mnt/pool/.f3-probe/f001-200mb.bin, сверка sha256 599b9472… против Linux-стороны (appliance или Linux-машина), fsck Linux-стороной. Дешёво возродить в рамках bcf013, если апстрим спросит.
+CANCELLED 2026-11-13 (owner's decision): as a standalone task — a zombie. The substance moved into bcf013 (the gate before the upstream PR): parity evidence on reviewer demand — probe file /mnt/pool/.f3-probe/f001-200mb.bin, verify sha256 599b9472… against the Linux side (appliance or a Linux machine), fsck from the Linux side. Cheap to revive within bcf013 if upstream asks.
 
 ## Acceptance Criteria
 
-- [ ] Linux-side fsck (VM) на образе после rw-прогона — чисто.
-- [ ] sha256 образа 599b9472… совпадает по обе стороны (портированные записи = побайтово те же).
-- [ ] Результат записан в рунбук.
+- [ ] Linux-side fsck (VM) on the image after an rw run — clean.
+- [ ] The image sha256 599b9472… matches on both sides (ported writes = byte-identical).
+- [ ] The result recorded in the runbook.
 
 ## Source
 
-docs/f3-runbook.org (журнал миграции org→taskmd; история: git log --grep 'Refs: bcf[0-9]+').
+docs/f3-runbook.org (the org→taskmd migration journal; history: git log --grep 'Refs: bcf[0-9]+').

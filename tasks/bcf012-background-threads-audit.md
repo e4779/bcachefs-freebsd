@@ -1,6 +1,6 @@
 ---
 id: "bcf012"
-title: "Хвост аудита фоновых потоков: cron-USR1 автоматизация + park-условия reconcile"
+title: "Background threads audit tail: reconcile park conditions"
 status: pending
 priority: high
 effort: medium
@@ -9,24 +9,24 @@ tags: [port]
 created_at: 2026-11-13
 ---
 
-# Хвост аудита фоновых потоков: park-условия
+# Background threads audit tail: park conditions
 
 ## Objective
 
-Аудит закрыт: потоки стартуют и работают; дренаж подтверждён живьём (SIGUSR1 → rw_pend 144М→18.8М секторов, ~240МБ/с). Открытый остаток — причины парковок. Автоматизация дренажа выделена в bcf025 (другой тип деливерабла: владельческое решение, не код).
+The audit is closed: the threads start and run; drainage confirmed live (SIGUSR1 → rw_pend 144M→18.8M sectors, ~240MB/s). The open remainder — the causes of parks. Drainage automation is split out into bcf025 (a different deliverable type: an owner decision, not code).
 
 ## Tasks
 
-- [ ] Park-условия: картировать (`needs_reconcile.rs` update_reconcile_opts, `plan.rs` parks_on) — где и почему паркуются.
-- [ ] Снять минимум одну парковку патчем ИЛИ задокументировать как инвариант.
+- [ ] Park conditions: map them (`needs_reconcile.rs` update_reconcile_opts, `plan.rs` parks_on) — where and why parking happens.
+- [ ] Remove at least one park with a patch OR document it as an invariant.
 
-Факты для старта: парковка на ENOSPC при полном HDD-target (Linux-era entries); «заморозка» счётчиков = wait 17.2ГБ io-clock[WRITE] между pass'ами.
+Facts to start from: a park on ENOSPC with a full HDD target (Linux-era entries); "freezing" of counters = a 17.2GB io-clock[WRITE] wait between passes.
 
 ## Acceptance Criteria
 
-- [ ] Карта park-условий в docs/notes (условие → файл/строка → статус).
-- [ ] Один park снят патчем или задокументирован как инвариант.
+- [ ] A park-condition map in docs/notes (condition → file/line → status).
+- [ ] One park removed with a patch or documented as an invariant.
 
 ## Source
 
-Вердикт Ф0 + журнал 2026-11-07 (066/067); хроника аудита осталась в docs/f3-runbook.org.
+F0 verdict + journal 2026-11-07 (066/067); the audit chronicle remains in docs/f3-runbook.org.

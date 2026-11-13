@@ -1,6 +1,6 @@
 ---
 id: "bcf003"
-title: "P3a: поименованный мьютекс-фикс — spinlock_types.h → pthread_spin"
+title: "P3a: named-mutex fix — spinlock_types.h → pthread_spin"
 status: pending
 priority: medium
 effort: medium
@@ -9,24 +9,24 @@ tags: [port]
 created_at: 2026-11-13
 ---
 
-# P3a: поименованный мьютекс-фикс — spinlock_types.h → pthread_spin
+# P3a: named-mutex fix — spinlock_types.h → pthread_spin
 
 ## Objective
 
-Семантика спина по P0-вердикту: статическая инициализация spinlock на FreeBSD = no-op (NULL-хендл → тихий EINVAL-лок; класс core 83736). Named mutex должен спинить честно: spinlock_types.h → pthread_spin. Инвариант: под spinlock не спят.
+Spin semantics per the P0 verdict: static spinlock init on FreeBSD = no-op (NULL handle → a silent EINVAL lock; core class 83736). The named mutex must spin honestly: spinlock_types.h → pthread_spin. Invariant: no sleeping under a spinlock.
 
 ## Tasks
 
-- [ ] overlay/files/include/linux/spinlock_types.h: pthread_spin-хендлы, инициализация реальная.
-- [ ] rg-аудит: ноль sleep-подобных вызовов под spinlock-секциями.
-- [ ] apply.sh с чистого клона — воспроизводимость.
+- [ ] overlay/files/include/linux/spinlock_types.h: pthread_spin handles, real initialization.
+- [ ] rg audit: zero sleep-like calls under spinlock sections.
+- [ ] apply.sh from a clean clone — reproducibility.
 
 ## Acceptance Criteria
 
-- [ ] apply.sh идемпотентен с чистого клона.
-- [ ] rg-аудит sleep-under-spinlock: ноль попаданий.
-- [ ] Acid-тест bcf001 зелёный с патчем в стеке.
+- [ ] apply.sh is idempotent from a clean clone.
+- [ ] rg audit of sleep-under-spinlock: zero hits.
+- [ ] The bcf001 acid test is green with the patch in the stack.
 
 ## Source
 
-P0-вердикт (runbook); класс core 83736; 069-комментарий spinlock_types.h.
+P0 verdict (runbook); core class 83736; 069 comment spinlock_types.h.

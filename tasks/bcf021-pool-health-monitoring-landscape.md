@@ -1,6 +1,6 @@
 ---
 id: "bcf021"
-title: "Мониторинг здоровья пула: ландшафт утилит и что портировать"
+title: "Pool health monitoring: utility landscape and what to port"
 status: pending
 priority: medium
 effort: large
@@ -9,48 +9,48 @@ tags: ["telemetry", "research"]
 created_at: 2026-11-13
 ---
 
-# Мониторинг здоровья пула: ландшафт утилит и что портировать
+# Pool health monitoring: utility landscape and what to port
 
 ## Objective
 
-Общая задача «на подумать»: как ПРАВИЛЬНО мониторить здоровье bcachefs-пула в
-нашем контуре. Не код — инвентаризация и вердикт.
+An open-ended "think it over" task: how to monitor bcachefs pool health PROPERLY in
+our setup. Not code — an inventory and a verdict.
 
-Контекст: hmlb-007 (homelab) отменён — legacy-hlmon (Rust-дашборд Debian-эпохи,
-исходники на thinkpad, описание в homelab `docs/debian/23-hlmon.md`) написан под
-Linux sysfs (`/sys/fs/bcachefs/`: reconcile_blocked, copygc_waiting_for_bytes,
-reconcile_target_pending_bytes), которого на FreeBSD host-FUSE линии не
-существует, а прод-плоскость пула с 2026-11-10 — именно host-FUSE. Generic
-дашборды (netdata/beszel/node_exporter) sysfs bcachefs не парсят — это и было
-мотивацией hlmon.
+Context: hmlb-007 (homelab) cancelled — legacy-hlmon (a Rust dashboard of the Debian
+era, the sources on the thinkpad, described in homelab `docs/debian/23-hlmon.md`)
+was written against Linux sysfs (`/sys/fs/bcachefs/`: reconcile_blocked,
+copygc_waiting_for_bytes, reconcile_target_pending_bytes), which does not exist on
+the FreeBSD host-FUSE line, and since 2026-11-10 the pool's prod plane is exactly
+host-FUSE. Generic dashboards (netdata/beszel/node_exporter) do not parse bcachefs
+sysfs — that was hlmon's motivation.
 
 ## Tasks
 
-- [ ] Инвентаризация: что наблюдаемо на каждой плоскости — host-FUSE (fuser-форк,
+- [ ] Inventory: what is observable on each plane — host-FUSE (the fuser fork,
       kit 066 reconcile-visibility, f3-heal v2.1 ring-staleness), VM-appliance
-      (Alpine гость: Linux sysfs существует, когда пул смонтирован), generic
-      FreeBSD (gstat/iostat — что дают, чего не дают)
-- [ ] Разбор наследства hlmon: какие метрики были ценными, что переносимо на
-      fuser-форк (эквиваленты reconcile_blocked/copygc_waiting в daemon-side
-      счётчиках), что выбросить вместе с docker/bollard частью
-- [ ] Ландшафт утилит: что есть в экосистеме bcachefs-tools (Linux) для
-      health/fsck-статусов и что из этого имеет смысл портировать или
-      реимплементировать поверх fuser
-- [ ] Пороги и алерты: существующие триггеры f3-heal (ring staleness) —
-      расширяемый ли каркас, чего не хватает (drift, perr, wedge-предвестники)
-- [ ] Вердикт: минимально достаточный монитор для прод (host-FUSE) + список
-      портов с оценкой усилий; отдельное решение — нужно ли что-то внутри
-      appliance на случай её возврата
+      (the Alpine guest: Linux sysfs exists when the pool is mounted), generic
+      FreeBSD (gstat/iostat — what they give, what they don't)
+- [ ] The hlmon legacy teardown: which metrics were valuable, what is portable to
+      the fuser fork (the reconcile_blocked/copygc_waiting equivalents in
+      daemon-side counters), what to discard together with the docker/bollard part
+- [ ] The utility landscape: what exists in the bcachefs-tools (Linux) ecosystem
+      for health/fsck statuses and which of it makes sense to port or
+      reimplement on top of fuser
+- [ ] Thresholds and alerts: the existing f3-heal triggers (ring staleness) —
+      is the frame extensible, what is missing (drift, perr, wedge precursors)
+- [ ] The verdict: a minimally sufficient monitor for prod (host-FUSE) + a port
+      list with effort estimates; a separate decision — whether anything is
+      needed inside the appliance in case of its return
 
 ## Acceptance Criteria
 
-- [ ] Вердикт-документ в docs/ (или pi-topic): метрики по плоскостям, выбранный
-      минимальный монитор, список портов с effort-оценкой
-- [ ] Каждое утверждение про «утилита X умеет Y» проверено (ман/исходники), а не
-      взято из памяти
-- [ ] Решение зафиксировано (консилиум, если спорно); в коде ничего не меняется —
-      реализация будет отдельными тасками
+- [ ] A verdict document in docs/ (or a pi-topic): the metrics per plane, the
+      chosen minimal monitor, a port list with effort estimates
+- [ ] Every claim of "utility X does Y" verified (man/sources), not taken
+      from memory
+- [ ] The decision recorded (a council if contested); nothing changes in the
+      code — the implementation will be separate tasks
 
 ## Source
 
-Решение владельца 2026-11-13 (выделение мониторинг-ландшафта в отдельный трек; наследник отменённого hmlb-007/hlmon).
+Owner decision 2026-11-13 (splitting the monitoring landscape into a separate track; the heir of the cancelled hmlb-007/hlmon).

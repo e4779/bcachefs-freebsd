@@ -13,24 +13,24 @@ created_at: 2026-11-13
 
 ## Objective
 
-Reply-path переживает смерть клиента и медленный диск. Три механики одним пакетом: destroy-before-reply (fuser#757; ветка destroy-before-reply уже в форке koverstreet — перенести), writev bounded retry (5×10ms на EAGAIN/EWOULDBLOCK/EINTR/ENOMEM), reply-registry + watchdog + reader-heartbeat. Escape-коды сверить с fuse_io.c.
+The reply-path survives client death and a slow disk. Three mechanics in one package: destroy-before-reply (fuser#757; the destroy-before-reply branch is already in the koverstreet fork — carry it over), writev bounded retry (5×10ms on EAGAIN/EWOULDBLOCK/EINTR/ENOMEM), reply-registry + watchdog + reader-heartbeat. Verify the escape codes against fuse_io.c.
 
 ## Tasks
 
-- [ ] Проверить: destroy-before-reply возможно УЖЕ в vendored (Cargo pins @8819589) — не портировать то, что есть.
-- [ ] Перенести destroy-before-reply из ветки форка, сверить с fuser#757.
-- [ ] writev bounded retry в channel.rs.
-- [ ] Reply-registry/watchdog/reader-heartbeat в session.rs.
-- [ ] Тест: искусственная смерть клиента под нагрузкой; umount -f под нагрузкой.
+- [ ] Check: destroy-before-reply may ALREADY be in vendored (Cargo pins @8819589) — do not port what is already there.
+- [ ] Carry destroy-before-reply over from the fork branch, verify against fuser#757.
+- [ ] writev bounded retry in channel.rs.
+- [ ] Reply-registry/watchdog/reader-heartbeat in session.rs.
+- [ ] Test: an artificial client death under load; umount -f under load.
 
-Материал: fuser-vendored/{channel.rs,session.rs}; core 69055 (читатели вечно в read(2) после Destroy — 070 лечит только umount -f, это общий случай).
+Material: fuser-vendored/{channel.rs,session.rs}; core 69055 (readers stuck forever in read(2) after Destroy — 070 cures only umount -f, this is the general case).
 
 ## Acceptance Criteria
 
-- [ ] umount -f под нагрузкой: ноль висящих читателей (procstat).
-- [ ] Смерть клиента: reply-path освобождается ≤1с.
-- [ ] Sync disk IO одного запроса не блокирует ответы других.
+- [ ] umount -f under load: zero hung readers (procstat).
+- [ ] Client death: the reply-path frees up ≤1s.
+- [ ] The sync disk IO of one request does not block the replies of others.
 
 ## Source
 
-Runbook Shape-1 (close-шторм → reply-path failure → брошенный мьютекс); fuser#757; core 69055.
+Runbook Shape-1 (close-storm → reply-path failure → an abandoned mutex); fuser#757; core 69055.
