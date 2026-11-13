@@ -1,5 +1,9 @@
 # Working with Taskmd Tasks
 
+**Task language: English** (owner decision 2026-11-13 — repo is public,
+no RU↔EN ping-pong). Chat/runbook prose stays Russian; task files,
+commit subjects and bodies are English.
+
 This project uses [taskmd](https://github.com/driangle/taskmd) for task management. Tasks are markdown files with YAML frontmatter. See `TASKMD_SPEC.md` for the full field reference.
 
 ## Task File Format
