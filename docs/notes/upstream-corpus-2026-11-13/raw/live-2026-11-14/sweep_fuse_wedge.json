@@ -1,0 +1,1 @@
+{"bugs":[{"last_change_time":"2015-05-07T15:33:26Z","component":"kern","creation_time":"2008-12-12T22:20:00Z","status":"Closed","product":"Base System","resolution":"Unable to Reproduce","summary":"[ahd] ahd(4) gets confused and wedges SCSI bus","id":129602}]}

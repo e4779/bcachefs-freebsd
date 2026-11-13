@@ -1,0 +1,1 @@
+{"bugs":[{"summary":"[FUSEFS]: Missing real support for attr/dentry cache timeouts","last_change_time":"2019-09-15T04:21:48Z","status":"Closed","product":"Base System","id":235773,"component":"kern","resolution":"FIXED","creation_time":"2019-02-16T00:35:24Z"}]}

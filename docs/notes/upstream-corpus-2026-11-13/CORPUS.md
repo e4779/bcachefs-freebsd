@@ -97,3 +97,14 @@ Receipts: `/tmp/fbsd-ai/c300130.txt` / `c300475.txt` / `bz300475.json` / `c30048
 - fusefs-мейнтейнерский ландшафт FreeBSD: один человек + pjdfstest-команда.
 - Дубли-проверка fuse EINTR/wedge/timeout/redirty: **не выполнялась** (канал REST проверен, термины готовы) — сделать до bcf005.
 - Гэп-хвосты для веб-воркера: fuser#757, cberner#29 (статус+тон), свежий AI-policy статус, bugzilla dup-sweep.
+---
+
+# Live addendum 2026-11-14 (researcher, shell)
+
+Полный текст — LIVE-ADDENDUM-2026-11-14.md; сырьё — raw/live-2026-11-14/. Кратко:
+
+1. **Дубли (§6): dup = none.** Слив всех fusefs (17) + fuse (39) багов REST'ом; EINTR — только 293028 (FIXED 2026-02-15, cp(1)); prior art 236530/236327/235773 закрыты (2019); живой смежный 287431 (fusefs deadlock unmount FUSE_INIT, In Progress, asomers) — другой путь. Нюанс: REST quicksearch не ищет в телах комментариев (остаточный риск мал).
+2. **fuser#29**: OPEN с 2020-10-04; asomers 2023-08-29: «use nmount instead of mount» — технический ключ pure-rust на FreeBSD.
+3. **fuser#757**: ISSUE третьего лица (painhardcore), 0 комментариев, тишина 5+ недель; реализация в форке автора. Статистика cberner (последние 100 closed): 71 self-merge, 29 внешних, смержено 6; #692 syncfs отклонён (потом сам #738), #645/#688 отклонены; koverstreet/fuser — 0 PR за всю историю. Паттерн: аддитивное берут, семантику reply/unmount — нет.
+4. **AI-policy live**: main CONTRIBUTING.md МЯГЧЕ stable/15 — reject только «without substantial human review and validation» + анти-train оговорка; жёсткий шаблон с main ушёл; D54817 стагнирует с 2026-04-27; D54366 login-gated (гэп).
+5. **lists.freebsd.org**: по bhyve-эре владельца не найдено (только зеркало 300130 в freebsd-bugs Nov).

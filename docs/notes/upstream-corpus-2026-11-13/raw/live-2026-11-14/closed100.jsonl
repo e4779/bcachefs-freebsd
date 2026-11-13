@@ -1,0 +1,100 @@
+{"merged":"2026-08-08T02:05:50Z","n":750,"title":"Let the simple example be mounted idmapped","user":"cberner"}
+{"merged":"2026-08-06T17:31:13Z","n":748,"title":"Support idmapped mounts, and give absent caller ids a type","user":"cberner"}
+{"merged":"2026-08-05T13:31:50Z","n":747,"title":"Report a creation time from the simple example","user":"cberner"}
+{"merged":"2026-08-05T03:54:42Z","n":746,"title":"Add Filesystem::statx() for FUSE_STATX","user":"cberner"}
+{"merged":"2026-08-05T01:09:02Z","n":745,"title":"Support O_TMPFILE in the simple example","user":"cberner"}
+{"merged":"2026-08-04T23:39:49Z","n":744,"title":"Support chattr and lsattr in the simple example","user":"cberner"}
+{"merged":"2026-08-04T21:39:18Z","n":743,"title":"Report the backing store's real capacity in the simple example","user":"cberner"}
+{"merged":"2026-08-04T19:44:25Z","n":742,"title":"Let an unprivileged writer drop security.capability in the simple example","user":"cberner"}
+{"merged":"2026-08-04T17:49:37Z","n":741,"title":"Install what xfstests needs to run more of its suite","user":"cberner"}
+{"merged":"2026-08-04T17:48:12Z","n":740,"title":"Add Filesystem::tmpfile() for FUSE_TMPFILE","user":"cberner"}
+{"merged":"2026-08-04T02:26:51Z","n":739,"title":"Update atime on read in the simple example","user":"cberner"}
+{"merged":"2026-08-04T03:14:31Z","n":738,"title":"Add Filesystem::syncfs() for FUSE_SYNCFS","user":"cberner"}
+{"merged":"2026-08-04T00:52:51Z","n":737,"title":"Leave a whiteout behind on RENAME_WHITEOUT in the simple example","user":"cberner"}
+{"merged":"no","n":735,"title":"Keep auto_unmount without a fusermount helper","user":"cberner"}
+{"merged":"2026-08-03T23:14:47Z","n":734,"title":"Take ctime and mtime from one clock reading in the simple example","user":"cberner"}
+{"merged":"2026-08-03T23:10:58Z","n":733,"title":"Test that a panic in init() leaves nothing mounted","user":"cberner"}
+{"merged":"2026-08-03T22:16:34Z","n":732,"title":"Support fifos, sockets and device nodes in the simple example","user":"cberner"}
+{"merged":"2026-08-03T22:09:14Z","n":731,"title":"Unmount eagerly when auto_unmount is set","user":"cberner"}
+{"merged":"2026-08-03T18:32:40Z","n":730,"title":"Test new_delete() rather than inval_entry() twice","user":"cberner"}
+{"merged":"2026-08-03T20:38:06Z","n":729,"title":"Empty the undiagnosed xfstests exclusion list","user":"cberner"}
+{"merged":"2026-08-03T17:02:09Z","n":728,"title":"Add Notifier::inc_epoch() to invalidate every cached entry at once","user":"cberner"}
+{"merged":"no","n":727,"title":"Do not panic when inode metadata cannot be read","user":"cberner"}
+{"merged":"2026-08-03T15:17:48Z","n":726,"title":"Convert std::fs::Metadata into FileAttr","user":"cberner"}
+{"merged":"2026-08-03T13:35:51Z","n":725,"title":"Clear privileges in the simple example's fallocate and copy_file_range","user":"cberner"}
+{"merged":"2026-08-03T13:34:48Z","n":724,"title":"Do not panic in the simple example's write()","user":"cberner"}
+{"merged":"2026-08-03T03:46:09Z","n":723,"title":"Switch the simple example to killpriv v2","user":"cberner"}
+{"merged":"2026-08-03T03:08:03Z","n":722,"title":"Fix a descriptor leak in the simple example's fallocate()","user":"cberner"}
+{"merged":"2026-08-03T01:43:31Z","n":721,"title":"Implement FUSE_HANDLE_KILLPRIV_V2","user":"cberner"}
+{"merged":"2026-08-02T23:59:32Z","n":720,"title":"Lint the experimental feature in CI","user":"cberner"}
+{"merged":"2026-08-02T16:31:57Z","n":719,"title":"Refuse capabilities fuser cannot honor","user":"cberner"}
+{"merged":"2026-08-01T17:29:59Z","n":718,"title":"Expire a directory entry instead of invalidating it","user":"cberner"}
+{"merged":"2026-08-01T15:47:56Z","n":717,"title":"Report how much room is left in a directory reply","user":"cberner"}
+{"merged":"2026-08-01T13:40:22Z","n":716,"title":"Parse the extended fuse_setxattr_in layout","user":"cberner"}
+{"merged":"2026-07-31T23:39:08Z","n":715,"title":"Name the file a failed mount could not reach","user":"cberner"}
+{"merged":"2026-07-31T22:49:31Z","n":714,"title":"Unmount lazily on Linux, so a busy filesystem is not left mounted","user":"cberner"}
+{"merged":"2026-07-31T21:42:33Z","n":713,"title":"Report the libfuse call that failed instead of a stale errno","user":"cberner"}
+{"merged":"2026-07-31T20:44:15Z","n":712,"title":"Escape and validate special characters in mount option values","user":"cberner"}
+{"merged":"2026-07-30T22:35:06Z","n":711,"title":"Forward macFUSE's rename flags to Filesystem::rename","user":"cberner"}
+{"merged":"2026-07-30T22:38:55Z","n":709,"title":"Wait for the session to end when dropping BackgroundSession","user":"cberner"}
+{"merged":"2026-07-25T14:33:08Z","n":708,"title":"Treat ECONNABORTED from the FUSE device as a clean session end","user":"cberner"}
+{"merged":"2026-07-25T04:06:13Z","n":707,"title":"Enforce the kernel's 4096-byte minimum in KernelConfig::set_max_write()","user":"cberner"}
+{"merged":"2026-07-24T23:58:33Z","n":706,"title":"Skip unmount during teardown when already unmounted","user":"cberner"}
+{"merged":"2026-07-24T19:40:05Z","n":705,"title":"Fix corruption of pre-epoch timestamps with fractional seconds","user":"cberner"}
+{"merged":"2026-07-24T18:39:28Z","n":704,"title":"Fix flaky multi-threaded mount test stats race","user":"cberner"}
+{"merged":"2026-07-24T17:11:08Z","n":703,"title":"Fix inverted POLLERR check in is_mounted()","user":"cberner"}
+{"merged":"2026-07-22T19:27:23Z","n":702,"title":"Add scheduled cargo-deny advisories check; remove unmaintained bincode","user":"cberner"}
+{"merged":"2026-07-22T18:40:22Z","n":701,"title":"Replace bincode with rmp-serde in the simple example","user":"cberner"}
+{"merged":"2026-07-22T04:37:33Z","n":700,"title":"Document the use of AI","user":"cberner"}
+{"merged":"2026-07-22T04:36:47Z","n":699,"title":"Update changelog","user":"cberner"}
+{"merged":"2026-07-22T04:36:18Z","n":698,"title":"Configuration for AI agents","user":"cberner"}
+{"merged":"2026-07-17T15:38:33Z","n":697,"title":"Update README with PR acceptance status","user":"cberner"}
+{"merged":"no","n":696,"title":"feat: add low level interrupts","user":"khanhtranngoccva"}
+{"merged":"2026-07-09T15:09:27Z","n":695,"title":"Bump nix to 0.31","user":"glamberson"}
+{"merged":"no","n":693,"title":"feat: allow experimental multithreading for macOS","user":"khanhtranngoccva"}
+{"merged":"no","n":692,"title":"Add sync_fs() to service FUSE_SYNCFS","user":"edmc-ss"}
+{"merged":"no","n":691,"title":"Allow user to set thread name","user":"khanhtranngoccva"}
+{"merged":"no","n":690,"title":"Allowing 'static capture of Request objects","user":"khanhtranngoccva"}
+{"merged":"no","n":689,"title":"Lookup-time passthrough initialization","user":"khanhtranngoccva"}
+{"merged":"no","n":688,"title":"Asynchronous unmounting methods for BackgroundSession","user":"khanhtranngoccva"}
+{"merged":"no","n":687,"title":"Standardize unmount implementations across backends","user":"khanhtranngoccva"}
+{"merged":"no","n":684,"title":"Derive Eq and PartialEq for Errno","user":"mhambre"}
+{"merged":"2026-05-27T18:53:39Z","n":683,"title":"Derive Eq and PartialEq for Errno","user":"AlessandroBono"}
+{"merged":"2026-05-14T16:55:26Z","n":682,"title":"Forbid AI authored commits","user":"cberner"}
+{"merged":"2026-05-10T20:47:03Z","n":680,"title":"ci: Remove duplicate cargo test command in BSD ci","user":"mhambre"}
+{"merged":"no","n":679,"title":"feat(session): add from_fds for externally pre-cloned fds","user":"XciD"}
+{"merged":"no","n":678,"title":"Export ForgetOne to allow implementing Filesystem::batch_forget","user":"olvrlrnz"}
+{"merged":"no","n":676,"title":"Add ReplyIoctl::retry for variable-size ioctls","user":"xfbs"}
+{"merged":"2026-04-12T22:53:01Z","n":675,"title":"Remove two xfstests that are super slow","user":"cberner"}
+{"merged":"2026-04-13T03:28:28Z","n":674,"title":"Fix FreeBSD FUSE mount missing allow_other option","user":"cberner"}
+{"merged":"no","n":673,"title":"Migrate FreeBSD CI from Cirrus to GitHub Actions","user":"cberner"}
+{"merged":"2026-04-13T03:28:16Z","n":672,"title":"Use Ubuntu 24.04 in all CI steps","user":"cberner"}
+{"merged":"2026-04-13T14:02:40Z","n":671,"title":"Migrate off CirrusCI","user":"cberner"}
+{"merged":"no","n":670,"title":"Parallelize xfstests by splitting into multiple test ranges","user":"cberner"}
+{"merged":"2026-04-12T04:13:05Z","n":669,"title":"Remove MacOS CI","user":"cberner"}
+{"merged":"2026-04-12T17:52:45Z","n":668,"title":"Update xfstests","user":"cberner"}
+{"merged":"2026-04-13T17:36:51Z","n":667,"title":"Add `ReplyEntry::entry_with_ttls` for distinct TTLs","user":"AM5800"}
+{"merged":"no","n":666,"title":"chore: Sync w/ fuser/master","user":"mhambre"}
+{"merged":"no","n":665,"title":"Add support for external Tokio runtimes in TokioAdapter","user":"riederm"}
+{"merged":"2026-03-16T02:54:53Z","n":664,"title":"Add CI check to prevent non-ASCII characters in source files","user":"cberner"}
+{"merged":"no","n":663,"title":"Cleanup async interface and map 1:1 with Filesystem trait","user":"mhambre"}
+{"merged":"2026-03-01T04:41:33Z","n":661,"title":"Remove rustfmt options that require nightly","user":"cberner"}
+{"merged":"2026-03-08T19:59:02Z","n":660,"title":"Allow for raw marshalling of BackingIds","user":"Popax21"}
+{"merged":"no","n":659,"title":"Make `mount_point` argument positional in `examples/simple.rs`","user":"numbleroot"}
+{"merged":"2026-02-15T15:50:55Z","n":657,"title":"Rename mount2() to mount() and spawn_mount2() to spawn_mount()","user":"cberner"}
+{"merged":"2026-02-15T15:50:43Z","n":656,"title":"Remove abi-* feature flags","user":"cberner"}
+{"merged":"no","n":655,"title":"Reap auto-unmount helper child process","user":"cberner"}
+{"merged":"no","n":654,"title":"Direct mount","user":"cberner"}
+{"merged":"2026-02-15T00:51:54Z","n":653,"title":"Move mount option methods to reuse them","user":"cberner"}
+{"merged":"2026-02-14T21:19:28Z","n":652,"title":"Remove deprecated mount() and spawn_mount()","user":"cberner"}
+{"merged":"2026-02-14T04:57:13Z","n":651,"title":"Convert several Filesystem methods to u64 offset","user":"cberner"}
+{"merged":"no","n":650,"title":"Convert several Filesystem methods to u64 offset","user":"cberner"}
+{"merged":"2026-02-14T01:15:44Z","n":649,"title":"Update 0.17 unreleased changelog notes","user":"cberner"}
+{"merged":"no","n":648,"title":"[draft] Add fallible unmounting","user":"khanhtranngoccva"}
+{"merged":"2026-02-08T00:03:54Z","n":647,"title":"Deny warnings on macos","user":"stepancheg"}
+{"merged":"2026-02-07T22:52:50Z","n":646,"title":"FUSE_DEV_IOC_CLONE","user":"stepancheg"}
+{"merged":"no","n":645,"title":"Direct mount without fusermount","user":"Vociferix"}
+{"merged":"2026-02-07T02:25:15Z","n":644,"title":"CanonicalTempDir","user":"stepancheg"}
+{"merged":"2026-02-05T04:42:22Z","n":643,"title":"Use generic wait_for_fuse_mount in FreeBSD tests","user":"stepancheg"}
+{"merged":"2026-02-05T04:42:34Z","n":642,"title":"Simplify macOS test exe termination","user":"stepancheg"}
+{"merged":"2026-02-04T03:58:54Z","n":641,"title":"Return nix::Result from libc_umount","user":"stepancheg"}

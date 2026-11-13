@@ -1,0 +1,17 @@
+295957 | In Progress/ | Base System/kern | fusefs: panic: cached attrs not locked when executing fuse-mounted file | ch:2026-06-09 lc:2026-09-25
+269330 | Open/ | Base System/kern | [fusefs]: data corruption with mmap and either o_direct or fspacectl | ch:2023-02-04 lc:2025-10-07
+281100 | Open/ | Base System/tests | fusefs tests silently skip themselves | ch:2024-08-27 lc:2024-08-28
+287431 | In Progress/ | Base System/kern | [fusefs]: deadlock during unmount if FUSE_INIT never completed | ch:2025-06-10 lc:2026-10-14
+253424 | In Progress/ | Base System/kern | [fusefs]: statfs doesn't set f_iosize ("optimal transfer block size") | ch:2021-02-11 lc:2025-01-21
+236379 | Open/ | Base System/kern | [FUSEFS] fuse(4) writes from aio(4) don't set the fuse_out_header.pid field correctly | ch:2019-03-07 lc:2026-07-20
+283391 | In Progress/ | Base System/kern | [fusefs] fuse_internal_cache_attrs: 0xfffff801e6e51898 is not exclusive locked but should be | ch:2024-12-17 lc:2026-03-30
+238197 | New/ | Base System/kern | [FUSEFS] fusefs supports neither chflags(2) not stat.st_birthtim | ch:2019-05-28 lc:2022-10-14
+296936 | New/ | Base System/kern | [fusefs] write() to a file opened with O_APPEND fails with EBADF | ch:2026-07-20 lc:2026-07-21
+283448 | Open/ | Base System/kern | [fusefs] use after free on NFS-exported file fuse systems | ch:2024-12-20 lc:2025-06-13
+293088 | New/ | Base System/kern | fusefs: doesn't allow per-filehandle direct io | ch:2026-02-10 lc:2026-07-20
+263447 | New/ | Ports & Packages/Individual Port(s) | sysutils/xen-tools: Fails to build if filesystems/fusefs-libs3 is installed | ch:2022-04-21 lc:2025-03-07
+238340 | New/ | Base System/kern | [FUSEFS] fusefs should use the vn_io_fault mechanism | ch:2019-06-05 lc:2026-02-21
+296237 | In Progress/ | Base System/tests | sys/fs/fusefs/destroy test intermittently failing in CI on riscv64 | ch:2026-06-23 lc:2026-07-18
+290486 | In Progress/ | Ports & Packages/Individual Port(s) | filesystems/fusefs-libs3 - upgrade and enable testing | ch:2025-10-24 lc:2026-03-20
+297854 | New/ | Ports & Packages/Individual Port(s) | filesystems/sshfs (as used by deskutils/kdeconnect-kde): does not work due to mount_fusefs not found in user's PATH | ch:2026-08-24 lc:2026-08-24
+273942 | Open/ | Base System/kern | [fusefs]: read operation changes ctime on FUSE filesystems | ch:2023-09-19 lc:2026-05-22

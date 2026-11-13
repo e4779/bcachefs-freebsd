@@ -1,7 +1,7 @@
 ---
 id: "bcf018"
 title: "Корпус материалов для апстрим-контрибуций FreeBSD: ai-policy, путь контрибуции, требования к коду"
-status: in-progress
+status: in-review
 priority: high
 effort: medium
 dependencies: []
@@ -34,7 +34,7 @@ context: ["tasks/bcf005-p5-kernel-patches-upstream-freebsd.md", "tasks/bcf014-fu
 - [x] AI-policy: статус на дату + чек-пункт «перепроверить перед отправкой каждого PR» (topic freebsd-ai-policy-status-2026-11).
 - [x] bhyve-история: полный список (PR 300130/300475/300480 + nct668x prep) с датами/статусами/паттерном — topic freebsd-upstream-prior-art-bhyve-2026-11.
 - [x] Корпус сослан из bcf005/bcf014/bcf016 (строка «Корпус» в каждой).
-- [ ] Дубли-секция §6: dup-sweep по bugzilla — в работе (researcher, live addendum); после него задача к приёмке.
+- [x] Дубли-секция §6: dup-sweep выполнен 2026-11-14 — dup = none (LIVE-ADDENDUM-2026-11-14.md §1; REST-обход multi-word задокументирован). Задача к приёмке владельцем.
 
 ## Source
 

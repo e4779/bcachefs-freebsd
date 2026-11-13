@@ -1,0 +1,39 @@
+293758 | Open/ | Base System/bin | syslogd refuses to start without IPv6 | ch:2026-03-12 lc:2026-09-15
+281100 | Open/ | Base System/tests | fusefs tests silently skip themselves | ch:2024-08-27 lc:2024-08-28
+222691 | New/ | Base System/misc | Thinkpad t440p - lid sysctl gets confused | ch:2017-09-29 lc:2024-12-24
+283391 | In Progress/ | Base System/kern | [fusefs] fuse_internal_cache_attrs: 0xfffff801e6e51898 is not exclusive locked but should be | ch:2024-12-17 lc:2026-03-30
+293088 | New/ | Base System/kern | fusefs: doesn't allow per-filehandle direct io | ch:2026-02-10 lc:2026-07-20
+263447 | New/ | Ports & Packages/Individual Port(s) | sysutils/xen-tools: Fails to build if filesystems/fusefs-libs3 is installed | ch:2022-04-21 lc:2025-03-07
+291877 | New/ | Ports & Packages/Individual Port(s) | www/garage 2.1.0 Connection refused (os error 61) | ch:2025-12-22 lc:2026-01-29
+180893 | Open/ | Base System/kern | [if_ethersubr] Packets received with own LLADDR confuse things. | ch:2013-07-27 lc:2025-02-25
+138663 | Open/ | Documentation/Manual Pages | system(3) man page confuses users about "return value of 127" | ch:2009-09-09 lc:2018-04-10
+286960 | New/ | Ports & Packages/Individual Port(s) | [new port] filesystems/disorderfs: FUSE filesystem that introduces non-determinism | ch:2025-05-20 lc:2025-05-20
+205697 | New/ | Base System/bin | vi gets confused and corrupts file being edited | ch:2015-12-29 lc:2024-12-24
+273942 | Open/ | Base System/kern | [fusefs]: read operation changes ctime on FUSE filesystems | ch:2023-09-19 lc:2026-05-22
+300112 | In Progress/ | Ports & Packages/Individual Port(s) | deskutils/xdg-desktop-portal: xdg-document-portal fails to start, frontend refuses to start ("No document portal") | ch:2026-10-26 lc:2026-10-27
+291901 | New/ | Base System/bin | routed(8) looks to be confused when an interface is renamed | ch:2025-12-23 lc:2026-03-01
+287431 | In Progress/ | Base System/kern | [fusefs]: deadlock during unmount if FUSE_INIT never completed | ch:2025-06-10 lc:2026-10-14
+253424 | In Progress/ | Base System/kern | [fusefs]: statfs doesn't set f_iosize ("optimal transfer block size") | ch:2021-02-11 lc:2025-01-21
+285914 | New/ | Ports & Packages/Individual Port(s) | ports-mgmt/pkg_tree: Gets confused with pkg 2.1.0 | ch:2025-04-06 lc:2025-06-10
+238197 | New/ | Base System/kern | [FUSEFS] fusefs supports neither chflags(2) not stat.st_birthtim | ch:2019-05-28 lc:2022-10-14
+189878 | Open/ | Base System/bin | newsyslog(8) confused by some timezones (apparently) | ch:2014-05-17 lc:2017-12-31
+154709 | Open/ | Base System/kern | [heimdal] Kerberos V5 refuses authentication because Read req failed: ASN.1 encoding ended unexpectedly [regression] | ch:2011-02-12 lc:2018-05-21
+254624 | New/ | Base System/kern | Detaching an iSCSI-connected swap should be refused | ch:2021-03-28 lc:2021-03-29
+246886 | New/ | Base System/kern | [sendfile] Nginx + NFS or FUSE causes VM stall | ch:2020-05-31 lc:2023-02-05
+238340 | New/ | Base System/kern | [FUSEFS] fusefs should use the vn_io_fault mechanism | ch:2019-06-05 lc:2026-02-21
+298141 | New/ | Ports & Packages/Individual Port(s) | filesystems/gvfs: why FUSE not enabled by default? | ch:2026-09-03 lc:2026-09-09
+290088 | New/ | Ports & Packages/Individual Port(s) | Update filesystems/hfsfuse to version 0.292 | ch:2025-10-08 lc:2025-10-08
+296237 | In Progress/ | Base System/tests | sys/fs/fusefs/destroy test intermittently failing in CI on riscv64 | ch:2026-06-23 lc:2026-07-18
+290486 | In Progress/ | Ports & Packages/Individual Port(s) | filesystems/fusefs-libs3 - upgrade and enable testing | ch:2025-10-24 lc:2026-03-20
+297854 | New/ | Ports & Packages/Individual Port(s) | filesystems/sshfs (as used by deskutils/kdeconnect-kde): does not work due to mount_fusefs not found in user's PATH | ch:2026-08-24 lc:2026-08-24
+235321 | New/ | Base System/bin | freebsd-update gets confused when updating a jail, and jail is missing ${j}/boot and/or ${j}/rescue and/or others | ch:2019-01-30 lc:2019-04-09
+295957 | In Progress/ | Base System/kern | fusefs: panic: cached attrs not locked when executing fuse-mounted file | ch:2026-06-09 lc:2026-09-25
+269330 | Open/ | Base System/kern | [fusefs]: data corruption with mmap and either o_direct or fspacectl | ch:2023-02-04 lc:2025-10-07
+236379 | Open/ | Base System/kern | [FUSEFS] fuse(4) writes from aio(4) don't set the fuse_out_header.pid field correctly | ch:2019-03-07 lc:2026-07-20
+239831 | New/ | Ports & Packages/Individual Port(s) | filesystems/lkl: lklfuse hangs on SIGINT on CURRENT | ch:2019-08-13 lc:2025-10-26
+152807 | Open/ | Base System/conf | [periodic] security 900.tcpwrap does not report any refused connections | ch:2010-12-03 lc:2017-12-31
+297572 | New/ | Ports & Packages/Individual Port(s) | [NEW PORT] filesystems/linux-rl9-fuse3-libs: FUSE library version 3 for Rocky Linux | ch:2026-08-16 lc:2026-08-16
+219036 | Open/ | Ports & Packages/Individual Port(s) | ports-mgmt/pkg:  pkg confused, installs older version over newer | ch:2017-05-03 lc:2025-10-26
+296936 | New/ | Base System/kern | [fusefs] write() to a file opened with O_APPEND fails with EBADF | ch:2026-07-20 lc:2026-07-21
+283448 | Open/ | Base System/kern | [fusefs] use after free on NFS-exported file fuse systems | ch:2024-12-20 lc:2025-06-13
+152661 | Open/ | Base System/bin | parallel make sometimes gets working dir confused | ch:2010-11-29 lc:2018-01-03
