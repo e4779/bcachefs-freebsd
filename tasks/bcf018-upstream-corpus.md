@@ -22,7 +22,8 @@ context: ["tasks/bcf005-p5-kernel-patches-upstream-freebsd.md", "tasks/bcf014-fu
 2. **Путь контрибуции 2026**: freebsd-src на GitHub (PR-флоу для внешних), reviews.freebsd.org — жив ли Phabricator-путь, Documentation/Committer instructions для внешних, ожидания по MFC/HEAD.
 3. **Требования к коду**: style(9) (кернел-C — наш случай для fuse_io/fuse_ipc патчей), конвенции commit-сообщений src, ожидания по репродюсам/тестам (pjdfstest, KYUA?).
 4. **Наша bhyve-история как prior art**: патчи, которые мы уже приносили в bhyve. ВАЖНО: индекс памяти покрывает только горячие сессии 2026-11-11..13 — эра bhyve-контрибуций туда не попала. Копать: homelab docs/runbooks, форки freebsd-src на GitHub владельца, почта/архивы рассылок. Что нашли: формат, куда шли (Differential? рассылка?), что приняли/отклонили и почему.
-5. **Дубли-проверка**: bugs.freebsd.org по fuse EINTR/wedge/timeout (нужно и bcf005 — объединить находки сюда).
+5. **Тон и практика конкретных мейнтейнеров/подсистем** (кормит место council-maintainer в bcf020): кто мейнтейнит sys/fs/fuse и koverstreet/fuser — тон прошлых обсуждений и реакция на внешние PR (fuser#757, cberner/fuser issue #29), что принимают/отклоняют и как аргументируют.
+6. **Дубли-проверка**: bugs.freebsd.org по fuse EINTR/wedge/timeout (нужно и bcf005 — объединить находки сюда).
 
 ## Acceptance Criteria
 

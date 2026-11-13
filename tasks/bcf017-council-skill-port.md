@@ -1,22 +1,27 @@
 ---
 id: "bcf017"
 title: "Порт скилла fabric-council в pi-etc: council на нативном subagent"
-status: pending
+status: cancelled
 priority: medium
 effort: medium
 dependencies: []
 tags: ["skills", "pi-etc", "orchestration"]
 created_at: 2026-11-13
 context: ["~/projects/pi-fabric/skillsets/python/fabric-council/SKILL.md"]
+cancelled_at: 2026-11-13
 ---
 
 # Порт скилла fabric-council в pi-etc: council на нативном subagent
 
+## VERDICT (владелец, 2026-11-13): ОТМЕНЕНА
+
+Сравнение показало: скиллы отличаются незначительно, процесс немного другой — суть та же. council-mode покрывает; порт смысла не имеет. Уникальные fabric-механики (mesh-паркинг отчётов, per-run model/thinking оверрайды) сейчас не нужны. Триггер пересмотра: появится потребность в кросс-сессионном паркинге отчётов или per-run моделях мест — открыть НОВУЮ задачу, эту не реанимировать. Места для этого проекта — bcf020.
+
 ## Objective
 
-Перенести механику консилиума из fabric-эры в текущий контур. Прокопано 2026-11-14: в pi-subagents (npm, vendor) УЖЕ есть скилл **council-mode** — протокол консилиума на нативном subagent. Слепой порт НЕ нужен; задача — сборка из двух половин и авторство мест.
+Перенести механику консилиума из fabric-эры в текущий контур. Прокопано 2026-11-13: в pi-subagents (npm, vendor) УЖЕ есть скилл **council-mode** — протокол консилиума на нативном subagent. Слепой порт НЕ нужен; задача — сборка из двух половин и авторство мест.
 
-## Что уже есть (сравнение — см. журнальную запись 2026-11-14)
+## Что уже есть (сравнение — см. журнальную запись 2026-11-13)
 
 - **council-mode** (протокол): персистентные профили `council-*` (2–3, max 4), 3-pass cap, cross-exam через resume с курируемыми challenge-пакетами, родитель курирует claims (≤5 на место), строгий memo, pass-contracts outputSchema. НЕ хранит отчёты сам, НЕ умеет per-run model/thinking оверрайды (stance живёт в профиле).
 - **fabric-council** (py/ts, pi-fabric): 3–8 произвольных ролей per-run ({role, model, thinking}), mesh-паркинг отчётов (runId, ifVersion=0, ретраи), синтез отдельной моделью в одном fabric_exec.
@@ -38,4 +43,4 @@ context: ["~/projects/pi-fabric/skillsets/python/fabric-council/SKILL.md"]
 
 ## Source
 
-Решение владельца 2026-11-13 («раньше пользовал fabric-council, перенеси в pi-etc и адаптируй»), уточнено 2026-11-14 после сравнения с council-mode.
+Решение владельца 2026-11-13 («раньше пользовал fabric-council, перенеси в pi-etc и адаптируй»), уточнено 2026-11-13 после сравнения с council-mode.

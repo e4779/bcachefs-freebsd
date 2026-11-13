@@ -4,9 +4,9 @@ title: "Места council-* внутри проекта (.pi/agents/): stance'�
 status: pending
 priority: medium
 effort: medium
-dependencies: ["bcf017", "bcf018", "bcf019"]
+dependencies: ["bcf018", "bcf019"]
 tags: ["skills", "council", "review"]
-created_at: 2026-11-14
+created_at: 2026-11-13
 context: ["tasks/bcf013-prepublication-patch-review.md", "tasks/bcf017-council-skill-port.md", "tasks/bcf018-upstream-corpus.md", "tasks/bcf019-quality-standards-research.md"]
 ---
 
@@ -26,7 +26,7 @@ context: ["tasks/bcf013-prepublication-patch-review.md", "tasks/bcf017-council-s
 ## Work
 
 - [ ] Профили `council-*.md` в `.pi/agents/`: модель, tools (read-only набор), context, stance в теле — по формату council-mode/pass-contracts.
-- [ ] Нюанс git: `.pi/` в gitignore — профили машинно-локальные. Канон stance'ов продублировать в теле этой задачи/pi-topics, чтобы место восстанавливалось после переезда.
+- [ ] Нюанс git (решение владельца 2026-11-13: «давай добавим»): профили трекуем в git — `git add -f .pi/agents/`; stance'ы живут в репо, восстановление = checkout. Дубль в pi-topics не нужен.
 - [ ] Сухой прогон: pass 1 на реальном патче (070 SIGURG-kick) с 2–3 местами — receipts, споры, memo.
 - [ ] Регистрация мест как доступных для bcf013 (обновить его Метод: консилиум = эти места).
 
@@ -34,8 +34,8 @@ context: ["tasks/bcf013-prepublication-patch-review.md", "tasks/bcf017-council-s
 
 - [ ] `subagent({action:"list"})` видит места; council-mode запускается без fallback oracle.
 - [ ] Memo сухого прогона приложен к журналу (Refs: bcf020).
-- [ ] Stance'ы восстанавливаемы из git/pi-topics после потери .pi/.
+- [ ] Stance'ы закоммичены (`.pi/agents/` форс-адд вопреки gitignore), переживают переезд через git.
 
 ## Source
 
-Решение владельца 2026-11-14 («после сбора корпуса — создать субагентов council-* внутри текущего проекта»).
+Решение владельца 2026-11-13 («после сбора корпуса — создать субагентов council-* внутри текущего проекта»).
