@@ -6,6 +6,7 @@ priority: high
 effort: medium
 type: chore
 tags: [upstream, kernel]
+dependencies: ["bcf013"]
 created_at: 2026-11-13
 context: [docs/f3-runbook.org, overlay/patches/kernel/]
 ---
@@ -16,7 +17,7 @@ context: [docs/f3-runbook.org, overlay/patches/kernel/]
 - fuse_io-etimedout-fail-fast.patch — ETIMEDOUT на записи не должен молча ретраиться вечно (redirty-цикл)
 - fuse_ipc-deadline-cap.patch — PCATCH msleep перезапускался с новым окном на каждый периодический сигнал (форма-4 wedge: поток никогда не видел ETIMEDOUT)
 Путь: PR на github.com/freebsd/freebsd-src (или reviews.freebsd.org).
-До отправки: сверить с текущим main fuse_ipc.c/fuse_io.c (наш /usr/src 15.1), приложить репродюс/обоснование из журнала (форма-4, стеки из китов), текст — по скиллу opensource-contribution (без AI-slop, evidence-first). Проверить дубликаты: багрепорты про fuse EINTR wedges в bugs.freebsd.org.
+До отправки: сверить с текущим main fuse_ipc.c/fuse_io.c (наш /usr/src 15.1), приложить репродюс/обоснование из журнала (форма-4, стеки из китов), текст — по скиллу opensource-contribution (без AI-slop, evidence-first). Проверить дубликаты: багрепорты про fuse EINTR wedges в bugs.freebsd.org. В описании PR — ссылка на проект https://github.com/e4779/bcachefs-freebsd (прод-догфудинг как мотивация). Партнёрский баг-репорт — bcf015.
 
 ## Source
 
