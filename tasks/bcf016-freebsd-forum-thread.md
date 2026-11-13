@@ -23,6 +23,8 @@ context: [docs/f3-runbook.org, docs/00-status.md]
 - **Границы**: что НЕ готово (крупный бэклог reconcile-парковки, кернел-патчи не в апстриме, формат необратим) — чтобы никто не хранил прод на этом до приёмки.
 - **Ссылки**: открытые PR (bcf005 kernel, bcf014 fuser), issue #29 cberner/fuser.
 
+Корпус: docs/notes/upstream-corpus-2026-11-13/ + topic freebsd-ai-policy-status-2026-11 (чек-пункт AI-дисклоужа перед публикацией).
+
 ## Шаги
 
 1. Текст по скиллу opensource-contribution (тон форумного поста, не пресс-релиза; без AI-slop).

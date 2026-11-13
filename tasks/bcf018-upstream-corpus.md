@@ -1,7 +1,7 @@
 ---
 id: "bcf018"
 title: "Корпус материалов для апстрим-контрибуций FreeBSD: ai-policy, путь контрибуции, требования к коду"
-status: pending
+status: in-progress
 priority: high
 effort: medium
 dependencies: []
@@ -29,11 +29,12 @@ context: ["tasks/bcf005-p5-kernel-patches-upstream-freebsd.md", "tasks/bcf014-fu
 
 ## Acceptance Criteria
 
-- [ ] Корпус осел в pi-topics: 1 базовый topic-указатель (карта секций, дата съёма) + тем по секциям по мере готовности; каждое утверждение с receipts (источник + дата).
-- [ ] Сырьё крупнее дайджеста — не в топиках: librarian-кэш/файлы, в топике — только ссылка.
-- [ ] AI-policy: статус на дату + чек-пункт «перепроверить перед отправкой каждого PR».
-- [ ] bhyve-история: хотя бы список патчей (id/тема/куда/исход), ссылки на апстрим-обсуждения если живы.
-- [ ] Корпус сослан из bcf005/bcf014/bcf016 (обновить их Source/context).
+- [x] Корпус осел: 4 pi-topics (ai-policy / contribution-path / bhyve-prior-art / maintainer-tone; receipts в каждом утверждении) + CORPUS.md как карта.
+- [x] Сырьё крупнее дайджеста — не в топиках: docs/notes/upstream-corpus-2026-11-13/raw/ (AI-гайд, Committer's Guide, отчёт Q3, D50650, GSOC, треды PR 300130/475/480, bz-снапшоты); в топиках — только ссылки.
+- [x] AI-policy: статус на дату + чек-пункт «перепроверить перед отправкой каждого PR» (topic freebsd-ai-policy-status-2026-11).
+- [x] bhyve-история: полный список (PR 300130/300475/300480 + nct668x prep) с датами/статусами/паттерном — topic freebsd-upstream-prior-art-bhyve-2026-11.
+- [x] Корпус сослан из bcf005/bcf014/bcf016 (строка «Корпус» в каждой).
+- [ ] Дубли-секция §6: dup-sweep по bugzilla — в работе (researcher, live addendum); после него задача к приёмке.
 
 ## Source
 

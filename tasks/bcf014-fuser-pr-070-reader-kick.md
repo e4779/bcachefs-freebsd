@@ -32,6 +32,8 @@ context: [overlay/files/, docs/f3-runbook.org, docs/evidence/core-69055-umount-h
 
 - PR открыт, ссылка записана в задачу (`--add-pr`), CI/фидбек отслежен.
 
+Корпус: docs/notes/upstream-corpus-2026-11-13/ + topics (maintainer-tone-fuser-fusefs-2026-11 — тон апстрима, freebsd-contribution-path-2026-11).
+
 ## Source
 
 docs/f3-runbook.org:14 «070 не в koverstreet/fuser»; решение владельца 2026-11-13 (трек публикации).

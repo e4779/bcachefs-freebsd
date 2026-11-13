@@ -24,6 +24,8 @@ context: [docs/f3-runbook.org, overlay/patches/kernel/]
 - [ ] PR открыт на freebsd-src, номер записан в задачу (`taskmd set bcf005 --add-pr <url>`).
 - [ ] CI/фидбек мейнтейнера отслежен, правки отправлены. В описании PR — ссылка на проект https://github.com/e4779/bcachefs-freebsd (прод-догфудинг как мотивация). Партнёрский баг-репорт — bcf015.
 
+Корпус: docs/notes/upstream-corpus-2026-11-13/ + topics (freebsd-ai-policy-status-2026-11, freebsd-contribution-path-2026-11, maintainer-tone-fuser-fusefs-2026-11).
+
 ## Source
 
 docs/f3-runbook.org:45 — org-заголовок «TODO P5: кернел-патчи в апстрим freebsd-src (sys/fs/fuse)» (мигрировано 2026-11-13).
