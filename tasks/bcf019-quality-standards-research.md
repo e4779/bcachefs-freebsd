@@ -1,7 +1,7 @@
 ---
 id: "bcf019"
 title: "FreeBSD code quality standards research, DoD = correct pi-topics"
-status: pending
+status: in-progress
 priority: medium
 effort: medium
 dependencies: ["bcf018"]

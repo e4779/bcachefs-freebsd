@@ -1,13 +1,14 @@
 ---
 id: "bcf018"
 title: "Corpus for FreeBSD upstream contributions: ai-policy, contribution path, code requirements"
-status: in-review
+status: completed
 priority: high
 effort: medium
 dependencies: []
 tags: ["upstream", "research", "docs"]
 created_at: 2026-11-13
 context: ["tasks/bcf005-p5-kernel-patches-upstream-freebsd.md", "tasks/bcf014-fuser-pr-070-reader-kick.md", "tasks/bcf016-freebsd-forum-thread.md"]
+completed_at: 2026-11-14
 ---
 
 # Corpus for FreeBSD upstream contributions
