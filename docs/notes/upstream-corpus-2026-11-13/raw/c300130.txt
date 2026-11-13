@@ -1,0 +1,382 @@
+### c0 e@4779.name:
+## Summary
+
+nfsrpc_setclient() bumps clp->nfsc_rev and sends co_verf = (nfs_exchangeboot,
+nfsc_rev) on EVERY setclient (sys/fs/nfsclient/nfs_clrpcops.c:1113 for v4.1,
+:1185 for v4.0; verifier built at :5541-5542). Per RFC 5661 s18.35.4 a changed
+verifier with the same owner means 'client rebooted': the server discards ALL
+prior state (sessions, stateids). When recovery is initiated not by a real
+reboot but by a racing operation failing NFSERR_BADSESSION/STALE_STATEID
+(nfscl_initiate_recovery -> nfscl_recover -> setclient), the client destroys
+its own valid server-side state. Every in-flight op then fails
+(BADSESSION on old session slots, BADSTATEID for old open stateids), each
+failure initiates recovery again, and the loop self-sustains for as long as
+streaming traffic races the replacement.
+
+## Observed on 15.1-RELEASE-p5 (amd64), NFSv4.2 mount, Linux nfsd 7.2.9 server
+
+mount options: nfsv4,minorversion=2,tcp,resvport,nconnect=4,hard,cto
+
+- Server tracepoints (nfsd_clid_confirmed / nfsd_cb_shutdown): full
+  EXCHANGE_ID+CREATE_SESSION cycle every ~1-20 s around the clock under load;
+  clientid cl_id counter +22 per 30 s; each predecessor session immediately
+  nfsd_cb_shutdown state=DOWN.
+- nfsd_compound_status(status!=0): OP_SEQUENCE status=10052 (BADSESSION)
+  ~1/4 s and OP_READ status=10025 (BADSTATEID) ~2/s during bursts.
+- Client narration (vfs.nfs.debuglevel=1): endless 'aft exch=0 / aft
+  createsess=0 / aft reclaimcomp=0' full-recovery cycles; intermittent
+  'Got badsession' / 'Marked defunct' / 'Badsession looping'.
+- Collateral: close(2)-triggered COMMIT that lands inside a replacement window
+  blocks forever (hard mount, rc_timeout=-1) — observed as userspace threads
+  stuck in nfsrpc_commit -> clnt_reconnect_call for tens of minutes while the
+  TCP connection stays ESTABLISHED and no retransmit SYN is ever sent.
+- Verified identical code in main and stable/15 (2026-10-26).
+
+## Related
+
+- PR 299221 — recovery storm after BADSESSION (CREATE_SESSION retry vs
+  EXCHANGE_ID fallback); fixed by patch, but the fallback path still bumps the
+  verifier, so the loop below survives that fix.
+- PR 299225 — struct nfsclds leak per recovery (same recovery machinery).
+- Commit 5ab48fb9f7ac re-arms recovery on every BADSESSION (cited in 299221).
+
+## Suggested direction
+
+Do not change the verifier for recovery initiated from
+nfscl_initiate_recovery()/nfscl_recover() when the clientid is still valid
+server-side: keeping co_verf stable lets CREATE_SESSION on the extant clientid
+succeed (the code already tries that first), so no state is destroyed and
+racing ops simply retry on the new session. Bump nfsc_rev only when the client
+truly lost its lease (nfscl_hasexpired path) or at first setclient.
+
+## Repro
+
+FreeBSD 15.1 client, Linux nfsd server, NFSv4.1+ hard mount with active
+streaming reads (seeding) plus writes; induce any recovery (e.g. server-side
+lease expiry) and observe the churn via server nfsd tracepoints.
+### c1 e@4779.name:
+Proposed fix (inline below): keep the EXCHANGE_ID verifier stable on
+the race-recovery fallback.
+
+The nfsc_rev bump in nfsrpc_setclient() fires not only on identity
+reset but also on the ExchangeID fallback taken by nfscl_recover()
+when CreateSession on the extant ClientID fails. Guarding it with
+odsp == NULL keeps the verifier stable on that fallback, so a server
+implementing RFC 5661 s18.35.4 case 2 reuses the confirmed client
+record instead of replacing it. Race-initiated recovery then no longer
+destroys live state, and the self-sustaining loop (every in-flight op
+failing BADSESSION/BADSTATEID, each failure re-arming recovery) stops.
+
+The bump remains for first-setclient and for nfscl_hasexpired()
+(retokp == NULL there), so lease loss still rotates the verifier once.
+The v4.0 SETCLIENTID path is intentionally untouched (same disease,
+no BADSESSION amplifier; noted for scope discussion).
+
+Testing (15.1-RELEASE-p5 amd64 client, Linux nfsd 7.2.9 server):
+
+Before: continuous full ExchangeID+CreateSession cycles ~1/s under
+load for days (clientid cl_id +22 per 30 s; OP_SEQUENCE
+NFS4ERR_BADSESSION ~1/4 s, OP_READ NFS4ERR_BADSTATEID ~2/s).
+
+After: 25 min quiet window with zero recovery prints under a 2 GiB
+write+sync; clientid frozen; zero non-zero-status compounds in a 30 s
+tracepoint window; a 45 s full NFS outage (iptables DROP on the
+server) survived with the clientid unchanged and no recovery fired.
+
+Residual single events: during two hours of active testing (server
+restarts, outages, boot-time recheck storm of ~700 torrents) six
+isolated recoveries occurred, each completing and going quiet --
+bounded events, not a loop. Pre-patch, the same conditions produce
+continuous churn.
+
+Known issue this patch surfaces (verified in-tree on both sides):
+FreeBSD nfsd's confirmed-reuse branch of exchange_id returns
+eir_sequenceid = 0 with a comment saying the client ignores it
+(sys/fs/nfs/nfs_nfsdstate.c), but nfscl stores eir_sequenceid and the
+fallback sends it as csa_sequenceid, while the server's confirm check
+expects lc_confirm + 1 and returns NFSERR_SEQMISORDERED -- which is
+not in nfscl_recover()'s retry set. Pre-patch this was unreachable
+because the verifier-change branch pre-syncs lc_confirm. Options:
+server returns lc_confirm + 1 on the reuse branch; or the client bumps
+the sequenceid when EXCHGID4_FLAG_CONFIRMED_R is set; or add
+SEQMISORDERED to the retry set with a one-time bump. Happy to prepare
+any of these as a follow-up.
+
+Also of note: pNFS/DS paths do not call nfsrpc_setclient (they do
+ExchangeID/CreateSession directly on the same clp), so this patch
+stabilizes the DS identity as well.
+
+Open question: the guard relies on the convention that odsp is only
+populated when retokp != NULL (nfscl_recover() is the only
+identity-preserving caller). A future caller passing retokp would
+silently lose the bump. If preferred, the bump can be hoisted to the
+callers or put behind an explicit identity_reset parameter.
+
+Patch (against 15.1-RELEASE-p5; applies to stable/15 and main at the
+same site):
+
+--- a/sys/fs/nfsclient/nfs_clrpcops.c
++++ b/sys/fs/nfsclient/nfs_clrpcops.c
+@@ -1109,7 +1109,15 @@ nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
+ 			/*
+ 			 * Either there was no previous session or the
+ 			 * CreateSession attempt failed, so...
+ 			 * do an ExchangeID followed by the CreateSession.
++			 * Only bump the verifier when there was no previous
++			 * session (identity reset).  When a session existed,
++			 * keep the verifier so that a server following
++			 * RFC 5661 s18.35.4 case 2 reuses the confirmed
++			 * client record instead of replacing it, destroying
++			 * all sessions/stateids and re-triggering recovery
++			 * for every racing operation (PR 300130).
+ 			 */
+-			clp->nfsc_rev = rev++;
++			if (odsp == NULL)
++				clp->nfsc_rev = rev++;
+ 			error = nfsrpc_exchangeid(nmp, clp, &nmp->nm_sockreq, 0,
+ 			    NFSV4EXCH_USEPNFSMDS | NFSV4EXCH_USENONPNFS, &dsp,
+ 			    cred, p);
+
+Developed with LLM assistance; the analysis, verification, and testing
+are the reporter's.
+### c2 linimon@FreeBSD.org:
+Created attachment 276661
+nfscl.patch
+
+^Triage: convert to Attachment using git diff.  (This is the new preferred
+submission method for Bugzilla.)
+### c3 des@FreeBSD.org:
+Rick, could you take a look?
+### c4 e@4779.name:
+The proposed odsp guard is insufficient: the loop survives via
+nfscl_hasexpired().
+
+Evidence (15.1-RELEASE amd64 client, kernel built from release sources with
+attachment 276661 applied; Linux nfsd 7.2.9 server, NFSv4.1 hard mount,
+nconnect=4, constant torrent-seeding READ load):
+
+1. Bypass path. odsp is only assigned when retokp != NULL
+   (nfs_clrpcops.c:1059-1064 in 15.1). nfscl_hasexpired() calls
+   nfsrpc_setclient(nmp, clp, 0, NULL, cred, p) (nfs_clstate.c), so odsp
+   stays NULL there and the verifier bump fires unconditionally on every
+   hasexpired cycle.
+
+2. With the guard applied, the loop re-armed within days and then ran
+   continuously for ~40 hours: 720+ "Initiate recovery" prints (typically
+   8-12/h under load, peaks 71/h). Server tracepoints during that period
+   showed nfsd_clid_confirmed with the same owner hash replacing itself
+   (6aebe03c:659355c1 -> c2), with OP_READ status=10025 bursts (15 in a
+   3-minute window). Client narration (vfs.nfs.debuglevel=1) showed full
+   cycles "exchangeid err=0 / aft exch=0 / aft createsess=0 / aft
+   reclaimcomp=0" without the "create session for extant ClientID" line —
+   the retokp==NULL path.
+
+3. Verifier semantics. co_verf = (nfs_exchangeboot, nfsc_rev); the boot half
+changes on client reboot, so nfsc_rev only distinguishes incarnations within
+one client lifetime. A recovery-triggered bump fabricates a reboot the client
+never had, and the server destroys a record that was still valid.
+
+Revised fix, tested locally on 15.1: bump only when the clientid has never
+been established in this clp's lifetime, plus a bounded escalation.
+
+- gate: if ((clp->nfsc_flags & NFSCLFLAGS_HASCLIENTID) == 0 ||
+  clp->nfsc_hasexpcount >= 3) clp->nfsc_rev = rev++;
+- nfscl_hasexpired() counts consecutive cycles (writes serialized by
+  clp->nfsc_lock) and resets after a quiet period of one lease interval
+  (2 * nfsc_renew; nfsc_renew is half the lease)
+- the v4.0 SETCLIENTID path is untouched
+
+The escalation threshold covers the legitimate cases first: one hasexpired
+cycle is an ordinary lease expiry, two can be a recovery race, three in a
+row means a stuck client record that s18.35.4 case 2 keeps returning
+confirmed but unusable. After escalation, each further hasexpired cycle
+rotates the verifier until a quiet lease interval resets the counter.
+
+HASCLIENTID is set-only in-tree (set on mount success and recovery, cleared
+only when the client is freed), so the gate holds across all retokp call
+shapes.
+
+Verification with this patch, plus cherry-picked 7a0021a0988f (PR 299221,
+extant-ClientID STALE_CLIENTID fallthrough) and 77a7a48a1cb0 (PR 298416,
+session-slot leak on write error paths; no recovery interaction): one
+bounded recovery at boot, then zero "Initiate recovery" prints over 1.5h
+across two reboots under the same seeding load; no compounds with non-zero
+status in a 3-minute tracepoint window 40 minutes after boot; client RPC
+counters TimedOut=0 across 1.56M requests. 7 amuled SIGABRTs occurred
+during the churn period (correlated with stateid-death windows; no cores
+captured, so causation unproven) and none after the patch.
+
+Patch attached: nfscl-verifier-v2-upstream.patch (relative to attachment 276661).
+### c5 e@4779.name:
+Created attachment 276998
+nfscl: keep the EXCHANGE_ID verifier stable within a client lifetime (v2: gate + escalation)
+### c6 e@4779.name:
+Attachment 276998's escalation clause is counterproductive under burst load; superseded by a corrected patch (attached next) that keeps only the gate.
+
+Further testing (same setup, sustained ~1.1k reads/s seeding/recheck load): once a burst of hasexpired cycles occurs, cycles recur faster than the counter's quiet-reset window, the escalation stays armed, and every setclient bumps the verifier again — 13 client records destroyed and recreated within 10 minutes (server trace: 13 nfsd_clid_confirmed paired with 13 nfsd_cb_shutdown, same owner hash). The escalation re-created the replacement storm inside bursts.
+
+The corrected patch is the pure gate: bump the verifier only while the clientid has never been established in this clp's lifetime ((clp->nfsc_flags & NFSCLFLAGS_HASCLIENTID) == 0). No counter, no escalation. The stuck-confirmed-record case the escalation guarded against has not been observed; if it ever is, the right valve is an extant-ClientID CreateSession attempt inside nfscl_hasexpired(), not a verifier bump.
+
+Verification of the pure gate (same load profile): zero client-record replacements in server tracepoint windows, zero "Initiate recovery" prints and zero amuled aborts over the first 33 minutes after boot under ~1.1k reads/s, where the previous kernels churned continuously.
+### c7 e@4779.name:
+Created attachment 277008
+nfscl: pure gate — bump the EXCHANGE_ID verifier only for the first setclient of the client (supersedes the escalation in attachment 276998)
+### c8 linimon@FreeBSD.org:
+^Triage: I'm trying to understand, do each of these patches need to be applied
+in order, or are some of them obsolete?
+### c9 e@4779.name:
+Created attachment 277145
+nfscl: gate the EXCHANGE_ID verifier bump on first setclient — self-contained diff against current stable/15
+### c10 e@4779.name:
+Created attachment 277146
+nfscl: gate the EXCHANGE_ID verifier bump on first setclient — self-contained diff against current stable/15
+### c11 e@4779.name:
+Final version attached: a self-contained diff against current stable/15.
+It applies to a stock tree on its own, so the ordering question goes
+away (previous attachments marked obsolete). No semantic change from
+the last revision — only the base; the end state is identical.
+
+Review note: only the NFSv4.1 EXCHANGE_ID bump is gated; the analogous
+v4.0 SETCLIENTID bump is left as-is and can be gated identically as a
+follow-up if v4.0 coverage is wanted.
+### c12 e@4779.name:
+Comment on attachment 276661
+nfscl.patch
+
+>diff --git a/sys/fs/nfsclient/nfs_clrpcops.c b/sys/fs/nfsclient/nfs_clrpcops.c
+>index ed19a782c5ba..0e041ea38e29 100644
+>--- a/sys/fs/nfsclient/nfs_clrpcops.c
+>+++ b/sys/fs/nfsclient/nfs_clrpcops.c
+>@@ -1085,8 +1085,16 @@ nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
+> 			 * Either there was no previous session or the
+> 			 * CreateSession attempt failed, so...
+> 			 * do an ExchangeID followed by the CreateSession.
+>+			 * Only bump the verifier when there was no previous
+>+			 * session (identity reset).  When a session existed,
+>+			 * keep the verifier so that a server following
+>+			 * RFC 5661 s18.35.4 case 2 reuses the confirmed
+>+			 * client record instead of replacing it, destroying
+>+			 * all sessions/stateids and re-triggering recovery
+>+			 * for every racing operation (PR 300130).
+> 			 */
+>-			clp->nfsc_rev = rev++;
+>+			if (odsp == NULL)
+>+				clp->nfsc_rev = rev++;
+> 			error = nfsrpc_exchangeid(nmp, clp, &nmp->nm_sockreq, 0,
+> 			    NFSV4EXCH_USEPNFSMDS | NFSV4EXCH_USENONPNFS, &dsp,
+> 			    cred, p);
+### c13 e@4779.name:
+Comment on attachment 276661
+nfscl.patch
+
+>diff --git a/sys/fs/nfsclient/nfs_clrpcops.c b/sys/fs/nfsclient/nfs_clrpcops.c
+>index ed19a782c5ba..0e041ea38e29 100644
+>--- a/sys/fs/nfsclient/nfs_clrpcops.c
+>+++ b/sys/fs/nfsclient/nfs_clrpcops.c
+>@@ -1085,8 +1085,16 @@ nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
+> 			 * Either there was no previous session or the
+> 			 * CreateSession attempt failed, so...
+> 			 * do an ExchangeID followed by the CreateSession.
+>+			 * Only bump the verifier when there was no previous
+>+			 * session (identity reset).  When a session existed,
+>+			 * keep the verifier so that a server following
+>+			 * RFC 5661 s18.35.4 case 2 reuses the confirmed
+>+			 * client record instead of replacing it, destroying
+>+			 * all sessions/stateids and re-triggering recovery
+>+			 * for every racing operation (PR 300130).
+> 			 */
+>-			clp->nfsc_rev = rev++;
+>+			if (odsp == NULL)
+>+				clp->nfsc_rev = rev++;
+> 			error = nfsrpc_exchangeid(nmp, clp, &nmp->nm_sockreq, 0,
+> 			    NFSV4EXCH_USEPNFSMDS | NFSV4EXCH_USENONPNFS, &dsp,
+> 			    cred, p);
+### c14 e@4779.name:
+Comment on attachment 276661
+nfscl.patch
+
+>diff --git a/sys/fs/nfsclient/nfs_clrpcops.c b/sys/fs/nfsclient/nfs_clrpcops.c
+>index ed19a782c5ba..0e041ea38e29 100644
+>--- a/sys/fs/nfsclient/nfs_clrpcops.c
+>+++ b/sys/fs/nfsclient/nfs_clrpcops.c
+>@@ -1085,8 +1085,16 @@ nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
+> 			 * Either there was no previous session or the
+> 			 * CreateSession attempt failed, so...
+> 			 * do an ExchangeID followed by the CreateSession.
+>+			 * Only bump the verifier when there was no previous
+>+			 * session (identity reset).  When a session existed,
+>+			 * keep the verifier so that a server following
+>+			 * RFC 5661 s18.35.4 case 2 reuses the confirmed
+>+			 * client record instead of replacing it, destroying
+>+			 * all sessions/stateids and re-triggering recovery
+>+			 * for every racing operation (PR 300130).
+> 			 */
+>-			clp->nfsc_rev = rev++;
+>+			if (odsp == NULL)
+>+				clp->nfsc_rev = rev++;
+> 			error = nfsrpc_exchangeid(nmp, clp, &nmp->nm_sockreq, 0,
+> 			    NFSV4EXCH_USEPNFSMDS | NFSV4EXCH_USENONPNFS, &dsp,
+> 			    cred, p);
+### c15 e@4779.name:
+Comment on attachment 276661
+nfscl.patch
+
+>diff --git a/sys/fs/nfsclient/nfs_clrpcops.c b/sys/fs/nfsclient/nfs_clrpcops.c
+>index ed19a782c5ba..0e041ea38e29 100644
+>--- a/sys/fs/nfsclient/nfs_clrpcops.c
+>+++ b/sys/fs/nfsclient/nfs_clrpcops.c
+>@@ -1085,8 +1085,16 @@ nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
+> 			 * Either there was no previous session or the
+> 			 * CreateSession attempt failed, so...
+> 			 * do an ExchangeID followed by the CreateSession.
+>+			 * Only bump the verifier when there was no previous
+>+			 * session (identity reset).  When a session existed,
+>+			 * keep the verifier so that a server following
+>+			 * RFC 5661 s18.35.4 case 2 reuses the confirmed
+>+			 * client record instead of replacing it, destroying
+>+			 * all sessions/stateids and re-triggering recovery
+>+			 * for every racing operation (PR 300130).
+> 			 */
+>-			clp->nfsc_rev = rev++;
+>+			if (odsp == NULL)
+>+				clp->nfsc_rev = rev++;
+> 			error = nfsrpc_exchangeid(nmp, clp, &nmp->nm_sockreq, 0,
+> 			    NFSV4EXCH_USEPNFSMDS | NFSV4EXCH_USENONPNFS, &dsp,
+> 			    cred, p);
+### c16 e@4779.name:
+Comment on attachment 276661
+nfscl.patch
+
+>diff --git a/sys/fs/nfsclient/nfs_clrpcops.c b/sys/fs/nfsclient/nfs_clrpcops.c
+>index ed19a782c5ba..0e041ea38e29 100644
+>--- a/sys/fs/nfsclient/nfs_clrpcops.c
+>+++ b/sys/fs/nfsclient/nfs_clrpcops.c
+>@@ -1085,8 +1085,16 @@ nfsrpc_setclient(struct nfsmount *nmp, struct nfsclclient *clp, int reclaim,
+> 			 * Either there was no previous session or the
+> 			 * CreateSession attempt failed, so...
+> 			 * do an ExchangeID followed by the CreateSession.
+>+			 * Only bump the verifier when there was no previous
+>+			 * session (identity reset).  When a session existed,
+>+			 * keep the verifier so that a server following
+>+			 * RFC 5661 s18.35.4 case 2 reuses the confirmed
+>+			 * client record instead of replacing it, destroying
+>+			 * all sessions/stateids and re-triggering recovery
+>+			 * for every racing operation (PR 300130).
+> 			 */
+>-			clp->nfsc_rev = rev++;
+>+			if (odsp == NULL)
+>+				clp->nfsc_rev = rev++;
+> 			error = nfsrpc_exchangeid(nmp, clp, &nmp->nm_sockreq, 0,
+> 			    NFSV4EXCH_USEPNFSMDS | NFSV4EXCH_USENONPNFS, &dsp,
+> 			    cred, p);
+### c17 rmacklem@FreeBSD.org:
+I'll have time to look at this around
+the end of Nov.
+
+I will note that lease expiry should never
+happen. It indicates no RPCs done on the Linux
+server for at least one minute.
+For this to occur, I think it would require a
+network partitioning or a heavily overloaded
+Linux NFS server. (Neither of these should ever
+happen in a well configured setup of systems/LAN.)

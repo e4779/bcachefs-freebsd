@@ -1,0 +1,132 @@
+### c0 e@4779.name:
+Synopsis: bhyve: uart backend spins at 100% CPU after console input EOF;
+IRQ storm livelocks single-vCPU guests Product: Base System / Component:
+bhyve / Severity: Affects Some People MFC: requested to stable/15
+
+Environment
+-----------
+
+FreeBSD 15.1-RELEASE-p6 userland, amd64; kernel rebuilt from
+15.1-RELEASE sources with two unrelated local patches; bhyve is stock
+/usr/sbin/bhyve from the release. AMD Ryzen 7 9700X (SVM).
+
+Guest: Debian 13, Linux 7.2, 1 vCPU, -l com1,stdio, stdin connected to a
+FIFO. Any guest that opens its serial port in interrupt-driven mode
+triggers the IRQ storm below; the host-side spin needs no guest at all.
+
+Reproduction
+------------
+
+The host-side spin does not depend on the guest:
+
+    mkfifo /tmp/c
+    (sleep 0.1 > /tmp/c &)    # writer opens, holds 0.1 s, exits -> permanent EOF
+    bhyve -H -s 0,hostbridge -s 31,lpc -l com1,stdio ... < /tmp/c
+
+The writer's open() blocks until bhyve opens the read side, so the EOF
+always arrives after the console backend is up; no race.
+
+Within seconds the mevent thread pins one host core. With a guest whose
+serial port is in interrupt-driven mode (getty/udev writing), add:
+
+    dtrace -n 'fbt::vioapic_set_irqstate:entry /arg1 == 4/ { @t[tid] = count(); } tick-5s { printa(@t); exit(0); }'
+
+I measured 6,248,423 calls in the 5 s window (thread name "mevent", from
+procstat -t). A second run with a caller-stack aggregation (8 s window)
+counted 8,013,187 and showed vmmdev_ioctl ->
+vioapic_set_irqstate(IRQSTATE_PULSE) -> vlapic_deliver_intr ->
+lapic_set_intr -> vcpu_notify_lapic.
+
+Control: the same boot with the FIFO writer held open produces no output
+from that probe (zero IRQ4 transitions) and the guest boots to
+userspace.
+
+Observed
+-------
+
+- ~1.25M IOAPIC pin-4 PULSE deliveries per second (both runs above). -
+Two bhyvectl --vm=X --get-stats snapshots 5 s apart: "vm exits due to
+  external interrupt" grows by 4,009,506, i.e. ~800K exits/s (each pulse
+  IPIs the running vCPU to force injection).
+- Single-vCPU Linux guest: soft lockups (handle_softirqs entered from
+  sysvec_apic_timer_interrupt), console output in slow motion, boot fails.
+  Four-vCPU guests mask it (other vCPUs service IRQ4); the storm itself
+  still burns the host core.
+
+Analysis
+--------
+
+- uart_stdio_backend() sets rfd = stdin (O_NONBLOCK) and the mevent
+  EVF_READ watcher is armed for it (uart_emul.c / uart_backend.c).
+- uart_drain() (uart_emul.c:192) runs per kqueue wakeup; on a FIFO at
+EOF
+  kqueue reports the descriptor permanently readable, so the mevent loop
+  spins.
+- Each drain calls uart_toggle_intr() (uart_emul.c:179) when not in
+  loopback mode. The emulated 16550 asserts its IRQ when BOTH the THRE
+  latch is set (every THR write latches it; an IIR read clears it) and
+  IER.ETXRDY is enabled, i.e. once a getty/udev has the port open in
+  interrupt-driven mode. The early-boot polled console has IER = 0,
+  which is exactly why the control run shows zero IRQ4 transitions.
+- On releng/15.1 the assert callback is lpc_uart_intr_assert()
+  (usr.sbin/bhyve/amd64/pci_lpc.c:197) -> libvmmapi vm_isa_pulse_irq(4,4)
+  -> VM_ISA_PULSE_IRQ ioctl -> vioapic_set_irqstate(IRQSTATE_PULSE).
+  On main the same toggle reaches pci_uart_intr_assert()
+  (usr.sbin/bhyve/pci_uart.c:48) -> pci_lintr_assert(); I have only
+  measured the 15.1 path.
+- Only the TCP socket backend handles EOF today (uart_tcp_disconnect()
+  via len == 0 && sc->tty.is_socket in uart_rxfifo_drain); stdio/tty
+  backends keep the armed watcher forever.
+- I diffed uart_backend.c across releng/15.1, stable/15 and main: the
+  three files are byte-identical, so the fallthrough is present on all
+  three branches. I did not trace the history further back.
+
+Related but distinct: PR 264038 (closed FIXED; a uart_emul panic, not a
+spin) and PR 296872 (guest hang on AMD with nmdm console; its own
+bhyvectl data shows 21-24K total ext-intr exits and a lock_delay spin,
+i.e. interrupt starvation, not a storm; different mechanism as far as
+the published data goes).
+
+Fix
+---
+
+Treat read() == 0 (and errno == EIO, defensively, for hung-up tty
+variants) on non-socket backends as a read-side hangup: delete the
+mevent reader (delete, not close: stdio must keep stdout, and the tty
+backend shares rfd == wfd), mark input closed, warnx once. Guard the
+three mevent re-arm sites (uart_rxfifo_getchar, rxfifo_putchar,
+uart_rxfifo_reset) so a guest UART reset cannot re-arm the spin.
+Semantics match the TCP disconnect: input stays off until VM restart,
+console TX is unaffected. mevent_delete is safe from the callback
+context (same as the existing uart_tcp_disconnect), and the backend
+mutex serializes it against vCPU-side register access.
+
+Patch attached (git diff; git apply --check passes against pristine
+releng/15.1). Built with -Werror clean.
+
+Testing
+-------
+
+- Reproducer above, stock bhyve: mevent thread + vCPU burn ~176% CPU,
+  guest wedged before the first systemd unit.
+- Same reproducer, patched bhyve: "uart: console input disconnected"
+  warnx once, CPU 0.0%, guest boots to login (24 systemd milestones),
+  zero IRQ4 pulses.
+- Control (live writer) on both: zero pulses, clean boot. - Running the
+patch in production on a 4-vCPU guest since today: console
+  via the tty/nmdm backend, logger restarts (peer close/reopen) do not
+  spin; console TX unaffected.
+
+Attachments: bhyve-uart-eof-spin.patch, bhyve-uart-eof-spin-dtrace.txt
+(curated measurements).
+
+Note on tooling: this report and the patch were prepared with
+LLM-assisted tooling under my supervision; every measurement, build, and
+test cited above was executed on the hosts described and the raw traces
+are kept.
+### c1 e@4779.name:
+Created attachment 276939
+bhyve: uart: disarm the mevent reader on console input EOF (git diff, applies to releng/15.1/stable-15/main; git apply --check clean)
+### c2 e@4779.name:
+Created attachment 276940
+curated DTrace/bhyvectl measurements for the report (runs described inline)
