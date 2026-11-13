@@ -20,6 +20,7 @@ context: [overlay/README.md, overlay/patches/, overlay/patches/kernel/, docs/f3-
 - **Кернел-патчи** (`overlay/patches/kernel/`, 2 шт): fuse_io-etimedout-fail-fast, fuse_ipc-deadline-cap. Ревью против семантики FreeBSD main (не только нашего /usr/src 15.1): не ломают ли легитимные ретраи, корректна ли работа с PCATCH/ETIMEDOUT, минимален ли дифф. Evidence из журнала (форма-4 wedge, стеки из китов) — готовится к приложению в bcf005.
 - **Демон-патчи 001–070** (overlay/patches + зеркала overlay/files): выборочно — всё, что войдёт в fuser-PR (070: channel.rs/session.rs, флаг Destroy-arm + реестр читателей + SIGURG) и всё, что заявлено в README репозитория. Критерии: нет отладочного мусора, нет мёртвого кода, патч самодостаточен и воспроизводим через apply.sh с чистого клона, комментарии честные (EN).
 - **Свежий прогон цепочки** из восстановленных из git исходников перед отправкой (штамп-идемпотентность apply.sh — сверка).
+- **Паритет-эвиденс (по требованию ревьюверов)**: кросс-валидация rw-записей против Linux — probe /mnt/pool/.f3-probe/f001-200mb.bin, сверка sha256 599b9472… с обеих сторон + fsck Linux-стороной (наследие отменённого bcf007; окружение — appliance или любая Linux-машина с bcachefs).
 
 ## Метод
 

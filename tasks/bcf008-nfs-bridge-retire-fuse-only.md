@@ -1,18 +1,19 @@
 ---
 id: "bcf008"
 title: "NFS-мост (poolmount + VM diod) на пенсию: FUSE-порт = единственный прод-путь"
-status: pending
+status: cancelled
 priority: low
 effort: small
 type: chore
 tags: [migration, someday]
 created_at: 2026-11-13
 context: [docs/f3-runbook.org, bench]
+cancelled_at: 2026-11-13
 ---
 
 # NFS-мост (poolmount + VM diod) на пенсию: FUSE-порт = единственный прод-путь
 
-SOMEDAY-режим: в org заголовок был без тела. FUSE-порт стал единственным прод-путём (прод-стек stash/qbittorrent/amuled/amutorrent на /mnt/pool с 2026-11-06) — мост poolmount + VM diod выводится из ротации; по мере надобности разобрать/задокументировать. Замеры моста против порта остаются в bench/ как базовая линия.
+ОТМЕНЕНО 2026-11-13 (решение владельца): вердикт «FUSE-порт = единственный прод-путь» зафиксирован (прод-стек stash/qbittorrent/amuled/amutorrent на /mnt/pool с 2026-11-06), мост выведен из ротации — но физический разбор сейчас = churn без выгоды: если appliance-линия вернётся в прод (возврат hmlb-005), мост возвращается вместе с ней. Замеры моста против порта остаются в bench/ как базовая линия. Ревизия решения — при следующем архитектурном ревью.
 
 ## Source
 
