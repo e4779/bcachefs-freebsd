@@ -8,7 +8,7 @@ Each task is a `.md` file with YAML frontmatter and a markdown body.
 
 ```yaml
 ---
-id: "bcf-001"
+id: "bcf001"
 title: "Task title"
 status: pending
 ---
@@ -192,6 +192,6 @@ Add JWT-based authentication to the API.
 
 This project uses **prefixed sequential** IDs with the prefix **"bcf"**.
 
-- Format: `bcf-NNN`
-- IDs are zero-padded sequential numbers with a prefix (e.g., `bcf-001`, `bcf-002`)
+- Format: `bcfNNN`
+- IDs are zero-padded sequential numbers with a prefix (e.g., `bcf001`, `bcf002`)
 - The prefix groups tasks by team, area, or project

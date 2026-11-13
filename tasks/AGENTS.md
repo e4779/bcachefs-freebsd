@@ -6,7 +6,7 @@ This project uses [taskmd](https://github.com/driangle/taskmd) for task manageme
 
 ```markdown
 ---
-id: "bcf-001"
+id: "bcf001"
 title: "Task title"
 status: pending
 priority: high
@@ -32,7 +32,7 @@ What this task accomplishes.
 - Criterion 1
 ```
 
-Files follow the pattern `BCF-NNN-descriptive-title.md` (e.g., `bcf-015-add-user-auth.md`).
+Files follow the pattern `bcfNNN-descriptive-title.md` (e.g., `bcf015-add-user-auth.md`).
 
 ## CLI Commands
 

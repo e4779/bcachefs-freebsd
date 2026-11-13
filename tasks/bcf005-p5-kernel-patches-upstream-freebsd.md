@@ -1,5 +1,5 @@
 ---
-id: "bcf-005"
+id: "bcf005"
 title: "P5: кернел-патчи fuse_io/fuse_ipc в апстрим freebsd-src"
 status: pending
 priority: high

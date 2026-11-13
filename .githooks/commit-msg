@@ -15,7 +15,7 @@
 #      fresh empty commit from a mechanical --amend (git exposes no amend
 #      signal), so the ambiguous case is allowed with a warning. The ops
 #      branch itself (non-empty ops) is always a hard reject.
-#   R4 ops commits REQUIRE 'Refs: bcf-NNN...' git trailer in the FINAL
+#   R4 ops commits REQUIRE 'Refs: bcfNNN...' git trailer in the FINAL
 #      paragraph — validated via git interpret-trailers --parse, the same
 #      view 'git log --format=%(trailers)' reads; comma list tolerated.
 #   R5 ops commits REQUIRE 'Context: ...' and 'Rollback: ...' trailers in
@@ -90,8 +90,8 @@ if git -C "$root" diff --cached --quiet >/dev/null 2>&1; then empty=yes; else em
 if [ "$type" = ops ]; then
   [ "$empty" = yes ] || reject R3 "ops commits are journal entries — stage nothing (git commit --allow-empty)"
   # R4 Refs trailer required (hard); comma lists tolerated
-  printf '%s\n' "$trailers" | grep -Eq '^Refs: bcf-[0-9]{3,}(, bcf-[0-9]{3,})*[[:space:]]*$' \
-    || reject R4 "ops commit requires 'Refs: bcf-NNN' trailer in the final paragraph (multiple: 'Refs: bcf-001, bcf-002')"
+  printf '%s\n' "$trailers" | grep -Eq '^Refs: bcf-?[0-9]{3,}(, bcf-?[0-9]{3,})*[[:space:]]*$' \
+    || reject R4 "ops commit requires 'Refs: bcfNNN' trailer in the final paragraph (multiple: 'Refs: bcf001, bcf002')"
   # R5 Context + Rollback trailers required
   printf '%s\n' "$trailers" | grep -Eq '^Context: .+' \
     || reject R5 "ops commit requires a 'Context: <why>' trailer in the final paragraph"
@@ -122,8 +122,8 @@ else
     fi
   fi
   # R6 Refs footer soft-warn for work commits
-  printf '%s\n' "$trailers" | grep -Eq '^Refs: bcf-[0-9]{3,}' \
-    || warn R6 "no 'Refs: bcf-NNN' trailer in the final paragraph — add it if this commit advances a task"
+  printf '%s\n' "$trailers" | grep -Eq '^Refs: bcf-?[0-9]{3,}' \
+    || warn R6 "no 'Refs: bcfNNN' trailer in the final paragraph — add it if this commit advances a task"
 fi
 
 # R7 body lines <= 100 chars (warn only)

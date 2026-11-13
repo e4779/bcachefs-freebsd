@@ -1,5 +1,5 @@
 ---
-id: "bcf-008"
+id: "bcf008"
 title: "NFS-мост (poolmount + VM diod) на пенсию: FUSE-порт = единственный прод-путь"
 status: pending
 priority: low

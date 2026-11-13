@@ -1,5 +1,5 @@
 ---
-id: "bcf-007"
+id: "bcf007"
 title: "Linux-кросс-валидация rw-записей порта (VM)"
 status: blocked
 priority: low

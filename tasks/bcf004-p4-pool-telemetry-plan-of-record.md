@@ -1,5 +1,5 @@
 ---
-id: "bcf-004"
+id: "bcf004"
 title: "P4: телеметрия пула — план-of-record Ф1/Ф2/Ф3/Ф4 (консилиум 2026-11-06)"
 status: blocked
 priority: medium

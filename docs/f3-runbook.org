@@ -50,7 +50,7 @@ C+B: destroy-before-reply семантика (fuser#757, форк koverstreet) +
 
 * Задачи
 
-Живой стейт задач — tasks/ (taskmd): taskmd list / taskmd board. История задачи: git log --grep 'Refs: bcf-NNN'. Задачи мигрированы 2026-11-13 (bcf-001..bcf-012); хроника вердиктов (P0, Ф0) остаётся в этом файле.
+Живой стейт задач — tasks/ (taskmd): taskmd list / taskmd board. История задачи: git log --grep 'Refs: bcf'. Задачи мигрированы 2026-11-13 (мигрированы как bcf001..bcf012, нормализованы 2026-11-13); хроника вердиктов (P0, Ф0) остаётся в этом файле.
 
 * Исследование (зафиксировано 2026-11-06, источники — исходники releng/15.1 + клон tools + gh)
 Полную выжимку с file:line см. docs/notes/19a-dogfood-engine.md «РАЗГОВОР С ИСТОЧНИКАМИ». Ключевое:

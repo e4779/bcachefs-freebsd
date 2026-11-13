@@ -1,5 +1,5 @@
 ---
-id: "bcf-002"
+id: "bcf002"
 title: "P2: f3-heal супервизор на посту; qbt стоп до atomic-фикса"
 status: blocked
 priority: medium

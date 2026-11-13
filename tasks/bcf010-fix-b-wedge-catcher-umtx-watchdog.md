@@ -1,5 +1,5 @@
 ---
-id: "bcf-010"
+id: "bcf010"
 title: "Fix B: wedge-catcher — сторож владельца umtx при зависании"
 status: completed
 priority: high

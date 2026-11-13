@@ -1,5 +1,5 @@
 ---
-id: "bcf-012"
+id: "bcf012"
 title: "Аудит фоновых потоков порта (reconcile/compression/copygc): стартуют ли вообще (fs.start(), fusemount.rs:2477)"
 status: pending
 priority: high

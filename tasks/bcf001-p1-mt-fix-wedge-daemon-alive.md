@@ -1,5 +1,5 @@
 ---
-id: "bcf-001"
+id: "bcf001"
 title: "P1-финал: MT-фикс wedge (8 потоков), дискриминатор daemon-alive при wedge"
 status: blocked
 priority: high

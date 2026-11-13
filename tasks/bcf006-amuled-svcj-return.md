@@ -1,5 +1,5 @@
 ---
-id: "bcf-006"
+id: "bcf006"
 title: "amuled: вернуть svcj после стабилизации"
 status: pending
 priority: medium

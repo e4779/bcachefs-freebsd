@@ -1,5 +1,5 @@
 ---
-id: "bcf-009"
+id: "bcf009"
 title: "Fix A: fuse_mounted multi-device false-negative (boot-fail)"
 status: completed
 priority: medium
