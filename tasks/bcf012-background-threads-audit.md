@@ -1,21 +1,34 @@
 ---
 id: "bcf012"
-title: "Аудит фоновых потоков порта (reconcile/compression/copygc): стартуют ли вообще (fs.start(), fusemount.rs:2477)"
+title: "Хвост аудита фоновых потоков: cron-USR1 автоматизация + park-условия reconcile"
 status: pending
 priority: high
-effort: large
-type: bug
+effort: medium
+dependencies: []
 tags: [port]
 created_at: 2026-11-13
-context: [docs/f3-runbook.org, docs/notes/19a-dogfood-engine.md]
 ---
 
-# Аудит фоновых потоков порта (reconcile/compression/copygc): стартуют ли вообще (fs.start(), fusemount.rs:2477)
+# Хвост аудита фоновых потоков: cron-USR1 + park-условия
 
-Из вердикта Ф0 (утро 2026-11-07, 9.3ч soak, 552 срезов): инфраструктура телеметрии работает (ring 60с, 0 инцидентов за ночь), но ДАННЫЕ вскрыли: reconcile_work.pend=144308320 и cmp=42114776 — ЕДИНСТВЕННЫЕ значения за все 9ч (sort -u = 1 строка) при живых dev_leaving (0->210432 секторов) и растущем btree_total => дренаж reconcile/compression в порту не ведётся: бэклог стоит; тиринг-политика декоративна (на тот момент). Компрессия 42МБ не применяется, pending 144МБ не переезжает. Влияние на прод некритично (данные целы, IO верен).
-Вопросы задачи: стартуют ли фоновые потоки вообще (fs.start(), fusemount.rs:2477), какие recovery passes нужны.
-Уточнения из журнала 2026-11-07 (инструмент 066 + патч 067): потоки стартуют и работают; «заморозка» счётчиков = wait-условие 17.2ГБ io-clock[WRITE] между pass'ами + Linux-era запаркованные entries (ENOSPC-парковка на полном HDD-target); ретрай pending-листа = опер-сигнал SIGUSR1 (reconcile_pending_wakeup) — дренаж подтверждён живьём (~240МБ/с, rw_pend 144М→18.8М секторов). Открытый остаток: автоматизация cron-USR1 — решение владельца; park-условия (needs_reconcile.rs update_reconcile_opts, plan.rs parks_on).
+## Objective
+
+Аудит закрыт: потоки стартуют и работают; дренаж подтверждён живьём (SIGUSR1 → rw_pend 144М→18.8М секторов, ~240МБ/с). Открытый остаток — две вещи: автоматизация дренажа и причины парковок.
+
+## Tasks
+
+- [ ] cron-USR1: периодический pending-scan (svcj-безопасный guard от шторма) — ИЛИ явное NO-GO владельца, записанное в рунбук.
+- [ ] Park-условия: картировать (`needs_reconcile.rs` update_reconcile_opts, `plan.rs` parks_on) — где и почему паркуются.
+- [ ] Снять минимум одну парковку патчем ИЛИ задокументировать как инвариант.
+
+Факты для старта: парковка на ENOSPC при полном HDD-target (Linux-era entries); «заморозка» счётчиков = wait 17.2ГБ io-clock[WRITE] между pass'ами.
+
+## Acceptance Criteria
+
+- [ ] cron-USR1 настроен ИЛИ NO-GO записан владельцем.
+- [ ] Карта park-условий в docs/notes (условие → файл/строка → статус).
+- [ ] Один park снят патчем или задокументирован как инвариант.
 
 ## Source
 
-docs/f3-runbook.org:41 — ВЕРДИКТ Ф0, «Новая задача порта: аудит фоновых потоков (reconcile/compression/copygc)…» (хроника вердикта остаётся в org; задача мигрирована 2026-11-13).
+Вердикт Ф0 + журнал 2026-11-07 (066/067); хроника аудита осталась в docs/f3-runbook.org.

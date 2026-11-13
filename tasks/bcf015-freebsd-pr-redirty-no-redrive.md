@@ -6,7 +6,7 @@ priority: medium
 effort: medium
 type: bug
 tags: [upstream, kernel]
-dependencies: ["bcf001", "bcf013"]
+dependencies: ["bcf023", "bcf013"]
 created_at: 2026-11-13
 context: [docs/f3-runbook.org, overlay/patches/kernel/, tasks/bcf001-p1-mt-fix-wedge-daemon-alive.md]
 ---

@@ -123,6 +123,22 @@ Write entries when starting, making key decisions, hitting blockers, or finishin
 
 Run `taskmd validate` before committing to check for missing fields, invalid values, duplicate IDs, circular dependencies, and broken references.
 
+## Task Review
+
+Before committing new or restructured tasks, run the project reviewer
+subagent (`.pi/agents/task-reviewer.md`, read-only): it enforces
+right-sizing (one task = one testable deliverable), anti-slop
+(chronicle lives in the git journal, not task bodies), verifiable AC,
+real-gating deps.
+
+```bash
+subagent({agent:"task-reviewer", task:"Review tasks/bcf[0-9]*.md. Return contract JSON."})
+```
+
+Post-run falsifier: `git status --porcelain tasks/` must be empty —
+the reviewer never mutates. It audits facts with commands and shows
+the check it ran.
+
 ## Reference
 
 - Full specification: `TASKMD_SPEC.md`

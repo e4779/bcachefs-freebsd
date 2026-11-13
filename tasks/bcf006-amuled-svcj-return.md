@@ -1,13 +1,14 @@
 ---
 id: "bcf006"
 title: "amuled: вернуть svcj после стабилизации"
-status: pending
+status: cancelled
 priority: medium
 effort: small
 type: improvement
 tags: [svcj]
 created_at: 2026-11-13
 context: [docs/f3-runbook.org]
+cancelled_at: 2026-11-13
 ---
 
 # amuled: вернуть svcj после стабилизации

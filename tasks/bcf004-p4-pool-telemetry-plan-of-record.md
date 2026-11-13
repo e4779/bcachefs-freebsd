@@ -1,23 +1,32 @@
 ---
 id: "bcf004"
-title: "P4: телеметрия пула — план-of-record Ф1/Ф2/Ф3/Ф4 (консилиум 2026-11-06)"
-status: blocked
+title: "P4-Ф3: C-lite restricted ioctl — спека + имплементация"
+status: pending
 priority: medium
 effort: large
-type: feature
+dependencies: []
 tags: [port, telemetry]
 created_at: 2026-11-13
-context: [docs/f3-runbook.org, docs/notes/p4-b-lite-spec.md, docs/notes/p4-c-lite-design.md]
 ---
 
-# P4: телеметрия пула — план-of-record Ф1/Ф2/Ф3/Ф4 (консилиум 2026-11-06)
+# P4-Ф3: C-lite restricted ioctl — спека + имплементация
 
-КОНТРФАКТ (синтез проверил сам, receipts): _IOC_SIZE(cmd) QUERY_ACCOUNTING несёт ТОЛЬКО фикс-заголовок (32B/160B) — метрики тиринга едут flex-array => restricted-only FUSE_IOCTL (вариант C как заявлен) НЕ МОЖЕТ доставить цель: CLI молча получит пустые метрики. C-full (RETRY/UNRESTRICTED) = рост scope 3-5x. Записи консилиума: mesh council/2026-11-06-15-39-18/reports; спеки: docs/notes/p4-b-lite-spec.md, docs/notes/p4-c-lite-design.md.
-План-of-record: Ф0 (часы, ГЕЙТ ЦЕЛИ): SIGINFO-дамп accounting/counters из демона, 24ч под прод-нагрузкой — если reconcile_work мёртв, транспорт не нужен вовсе (закрыт: вердикт Ф0 от 2026-11-07 в runbook — инфра работает). Ф1 (дни): A+ = снапшот-кольцо /var/run/bcachefs-fuse/<uuid>/ (свежесть ts/gen/pid/uuid + провенанс live|snapshot, атомарная запись) + fstype-гейт + handle.rs fallback (~20 строк) — дашборд-ценность ~90% hlmon (инцидент 2х дней диагностировался трендом, не интерактивом). Ф2: B-lite spec-freeze (НЕ строим; триггеры: инцидент-часы до зрелости A+, C-full отклонён/стоит 2+ спринта, RCA lost-WRITE блокирует окна). Ф3: C-lite (restricted, фикс-размеры only) — отдельный трек, апстрим-подарок freebsd (TODO у них в дереве). Ф4: C-full — явное перепринятие решения (владеет security-напряжением RETRY/UNRESTRICTED).
-Инварианты Ф1: без unwrap (rctl-SIGKILL = смерть маунта!), mem_read (не locked), nice, stale-должен-выглядеть-stale, снапшот не станит единственный воркер.
-Cut: mutating-ioctl'ы навсегда (DATA/FSCK_ONLINE/DISK_*), fs top/timestats из решения, «stock CLI end-to-end» как планка приёмки.
-Фальсификаторы: счётчики мёртвые под нагрузкой => цель недействительна, задача=инструментация; апстрим+RETRY-прототип на стейдже => C-full обратно, B-lite в отставку.
+## Objective
+
+Единственный исполнимый кусок плана-of-record: Ф3 C-lite (restricted, фикс-размеры only). План-of-record (Ф0 закрыт, Ф1 доставлен, Ф2/Ф4 триггер-гейтед, инварианты, cut-list, фальсификаторы) переехал в `docs/notes/p4-plan-of-record.md` — читать её перед работой, она задает границы.
+
+## Tasks
+
+- [ ] Спека C-lite: restricted-only FUSE_IOCTL, фикс-размеры (НЕ flex-array — КОНТРФАКТ: `_IOC_SIZE(QUERY_ACCOUNTING)` несёт только заголовок, метрики тиринга едут flex-array ⇒ C-full рост 3-5x).
+- [ ] Имплементация C+Rust по спеке.
+- [ ] CLI читает счётчики с живого демона.
+
+## Acceptance Criteria
+
+- [ ] Спека ревьюнута владельцем до имплементации.
+- [ ] CLI читает счётчики с живого прод-демона.
+- [ ] rg-аудит: ноль mutating-ioctl (DATA/FSCK_ONLINE/DISK_*).
 
 ## Source
 
-docs/f3-runbook.org:37 — org-заголовок «WAITING P4: телеметрия пула — план-of-record от консилиума…» (мигрировано 2026-11-13).
+Консилиум 2026-11-06; мемо переехало в docs/notes/p4-plan-of-record.md (2026-11-13).
