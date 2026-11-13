@@ -25,7 +25,7 @@ context: ["~/projects/pi-fabric/skillsets/python/fabric-council/SKILL.md"]
 
 ## Work
 
-- [ ] Авторство 2–4 профилей `council-*` (stance из старых seat'ов + AGENTS-персоны) — в user `~/.pi/agent/agents/` или pi-etc с установкой (решить; pi-etc переживает обновления npm).
+- [ ] Профили для ЭТОГО проекта выделены в bcf020 (не дублировать здесь); bcf017 — только общая механика: паркинг, оверрайды, записка «когда консилиум».
 - [ ] Паркинг: fabric-механику mesh (runId + ifVersion=0) перевести на файлы (`tmp/council/<ts>/`), или принять, что council-mode достаточно (run id'ы в memo) — по итогам сухого прогона.
 - [ ] Если council-mode не покрывает per-run model/thinking оверрайды — расширить profiles или скилл-обвязку в pi-etc (НЕ форк npm-пакета).
 - [ ] Записка в pi-etc: когда консилиум, когда одиночный skeptic (всякая проверка — не консилиум); связка с bcf013.
