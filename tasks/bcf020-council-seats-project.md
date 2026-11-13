@@ -4,7 +4,7 @@ title: "Места council-* внутри проекта (.pi/agents/): stance'�
 status: pending
 priority: medium
 effort: medium
-dependencies: ["bcf018", "bcf019"]
+dependencies: ["bcf018", "bcf019", "bcf013"]
 tags: ["skills", "council", "review"]
 created_at: 2026-11-13
 context: ["tasks/bcf013-prepublication-patch-review.md", "tasks/bcf017-council-skill-port.md", "tasks/bcf018-upstream-corpus.md", "tasks/bcf019-quality-standards-research.md"]
@@ -14,7 +14,7 @@ context: ["tasks/bcf013-prepublication-patch-review.md", "tasks/bcf017-council-s
 
 ## Objective
 
-Проектные (не пользовательские) профили советников для council-mode — под ревью патчей этого проекта (bcf013) и будущие архитектурные споры. Возможность подтверждена: council-mode ищет `council-*` в user ИЛИ project agent-каталогах; здесь — `~/projects/bcachefs-freebsd/.pi/agents/` (сейчас пуст). Зависимость от корпуса (bcf018) и стандартов (bcf019) — потому что stance мест должен опираться на материал, не на вкус.
+Проектные (не пользовательские) профили советников для council-mode — под ревью патчей этого проекта. Возможность подтверждена: council-mode ищет `council-*` в user ИЛИ project agent-каталогах; здесь — `~/projects/bcachefs-freebsd/.pi/agents/` (сейчас пуст). Зависимости: корпус (bcf018) и стандарты (bcf019) дают stance'ам материал; **bcf013** даёт живой материал для валидации мест (решение владельца 2026-11-13: «как ревьювить, если ещё нечего» — места собираются под запущенное ревью, их сухой прогон = первые туры bcf013 на реальных патчах, не отдельный стенд).
 
 ## Roster (кандидаты, council-mode: max 4)
 
@@ -27,7 +27,7 @@ context: ["tasks/bcf013-prepublication-patch-review.md", "tasks/bcf017-council-s
 
 - [ ] Профили `council-*.md` в `.pi/agents/`: модель, tools (read-only набор), context, stance в теле — по формату council-mode/pass-contracts.
 - [ ] Нюанс git (решение владельца 2026-11-13: «давай добавим»): профили трекуем в git — `git add -f .pi/agents/`; stance'ы живут в репо, восстановление = checkout. Дубль в pi-topics не нужен.
-- [ ] Сухой прогон: pass 1 на реальном патче (070 SIGURG-kick) с 2–3 местами — receipts, споры, memo.
+- [ ] Сухой прогон: pass 1 на реальном патче из очереди bcf013 (070 SIGURG-kick и соседи) с 2–3 местами — receipts, споры, memo.
 - [ ] Регистрация мест как доступных для bcf013 (обновить его Метод: консилиум = эти места).
 
 ## Acceptance Criteria
