@@ -1,12 +1,13 @@
 ---
 id: "bcf029"
 title: "events_unbound worker leak: percpu slots not freed on exit"
-status: in-progress
+status: completed
 priority: critical
 effort: medium
 dependencies: ["bcf028"]
 tags: ["port", "kernel", "hotfix"]
 created_at: 2026-11-14
+completed_at: 2026-11-14
 ---
 
 # events_unbound worker leak: percpu slots not freed on exit

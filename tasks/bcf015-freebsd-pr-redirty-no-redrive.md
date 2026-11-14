@@ -1,7 +1,7 @@
 ---
 id: "bcf015"
 title: "FreeBSD PR (bug report): redirty-no-redrive — the kernel retries an ETIMEDOUT write forever"
-status: blocked
+status: in-progress
 priority: medium
 effort: medium
 type: bug

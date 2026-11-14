@@ -1,12 +1,13 @@
 ---
 id: "bcf023"
 title: "P1c: daemon-alive discriminator at wedge — evidence gate for the bug report"
-status: blocked
+status: completed
 priority: high
 effort: small
 dependencies: []
 tags: [evidence, wedge]
 created_at: 2026-11-13
+completed_at: 2026-11-14
 ---
 
 # P1c: daemon-alive discriminator at wedge
