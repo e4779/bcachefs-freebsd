@@ -1,0 +1,159 @@
+diff --git a/linux/percpu.c b/linux/percpu.c
+index 123087ba7..475ac5a08 100644
+--- a/linux/percpu.c
++++ b/linux/percpu.c
+@@ -301,6 +301,16 @@ void bch_percpu_thread_init(void)
+ 		abort();
+ 	}
+ 
++	/*
++	 * Warn well before the cap. Growth past this is almost always
++	 * workqueue workers that piled up behind bursts and did not retire -
++	 * loud here beats silent until the abort at the cap takes the daemon
++	 * down with its stderr.
++	 */
++	if (my_id >= BCH_PERCPU_MAX_CPUS * 3 / 4)
++		fprintf(stderr, "bch_percpu_thread_init: %d of %d percpu slots in use\n",
++			my_id + 1, BCH_PERCPU_MAX_CPUS);
++
+ 	/* Address space, not memory - pages fault in as they're touched: */
+ 	size_t chunk_size = bch_percpu_static_size + bch_percpu_dynamic_size;
+ 	void *chunk = mmap(NULL, chunk_size, PROT_READ|PROT_WRITE,
+diff --git a/linux/workqueue.c b/linux/workqueue.c
+index a82c59029..81b4b7789 100644
+--- a/linux/workqueue.c
++++ b/linux/workqueue.c
+@@ -45,6 +45,7 @@ struct workqueue_struct {
+ 	struct list_head	pending_work;
+ 
+ 	struct list_head	workers;
++	struct list_head	dead_workers;
+ 	unsigned		nr_workers;
+ 	unsigned		max_active;
+ 	char			name[24];
+@@ -53,6 +54,14 @@ struct workqueue_struct {
+ /* What the kernel uses when a caller passes 0. */
+ #define WQ_DFL_ACTIVE	256
+ 
++/*
++ * How long a worker idles before it retires itself, provided the queue has
++ * another idle worker to stay warm. Workers never exit on their own here, and
++ * each holds a percpu slot (bch_percpu_thread_init()) for as long as it
++ * lives - see the retirement in worker_thread().
++ */
++#define WQ_WORKER_IDLE_TIMEOUT	(5 * HZ)
++
+ static unsigned nr_idle_workers(struct workqueue_struct *wq)
+ {
+ 	struct wq_worker *w;
+@@ -152,6 +161,7 @@ static int worker_thread(void *arg)
+ 	struct wq_worker *worker = arg;
+ 	struct workqueue_struct *wq = worker->wq;
+ 	struct work_struct *work;
++	unsigned long idle_since = jiffies;
+ 
+ 	pthread_mutex_lock(&wq_lock);
+ 	while (1) {
+@@ -164,8 +174,45 @@ static int worker_thread(void *arg)
+ 
+ 		work = find_runnable_work(wq);
+ 		if (!work) {
++			/*
++			 * Retire if the burst that justified this worker is
++			 * long over. Contention spikes spawn workers up to
++			 * max_active, and a worker holds its percpu slot for
++			 * as long as it lives - workers that outlive their
++			 * burst are pure slot waste, and enough of them
++			 * aborts the daemon in bch_percpu_thread_init().
++			 * One idle worker stays warm, so a queue nothing
++			 * blocks on still settles at exactly one thread.
++			 *
++			 * The park below wakes on a timer, so retirement does
++			 * not depend on anyone waking us.
++			 */
++			if (list_empty(&wq->pending_work) &&
++			    nr_idle_workers(wq) > 1 &&
++			    time_after(jiffies, idle_since + WQ_WORKER_IDLE_TIMEOUT)) {
++				list_del(&worker->list);
++				wq->nr_workers--;
++
++				/*
++				 * Not kfree()d here: destroy_workqueue() stops
++				 * and frees the remaining workers without
++				 * holding wq_lock, so it must never come here
++				 * by surprise. Parked on dead_workers under
++				 * the lock instead - task == NULL is the dead
++				 * marker - and freed when the queue is
++				 * destroyed. Retiring is also impossible once
++				 * destroy_workqueue() holds the lock: the
++				 * worker list it empties makes
++				 * nr_idle_workers() come back zero, so nothing
++				 * is freed twice and nothing freed is stopped.
++				 */
++				worker->task = NULL;
++				list_add(&worker->list, &wq->dead_workers);
++				break;
++			}
++
+ 			pthread_mutex_unlock(&wq_lock);
+-			schedule();
++			schedule_timeout(WQ_WORKER_IDLE_TIMEOUT);
+ 			pthread_mutex_lock(&wq_lock);
+ 			continue;
+ 		}
+@@ -189,6 +236,9 @@ static int worker_thread(void *arg)
+ 		worker->current_work = NULL;
+ 		pthread_cond_broadcast(&work_finished);
+ 
++		/* A new idle period starts when this item is done: */
++		idle_since = jiffies;
++
+ 		/*
+ 		 * Anything still queued may have been passed over by a worker
+ 		 * that then slept - including because it was this very item,
+@@ -426,23 +476,29 @@ void drain_workqueue(struct workqueue_struct *wq)
+ void destroy_workqueue(struct workqueue_struct *wq)
+ {
+ 	struct wq_worker *w, *n;
++	LIST_HEAD(stopping);
+ 
+ 	/*
+ 	 * kthread_stop() waits for the worker, and the worker needs wq_lock to
+-	 * get out of its loop - so stop them all without it. Freeing them is
+-	 * the part that needs care: work_running() walks every queue's worker
+-	 * list from other threads, so nothing may be freed until this queue is
+-	 * off wq_list and unreachable.
++	 * get out of its loop - so take the workers off the queue under the
++	 * lock and stop them without it. Retired workers come along on the
++	 * same list: their threads are already gone, they are only here to be
++	 * freed. Freed workers must never be walked unlocked, either -
++	 * work_running() walks every queue's worker list from other threads -
++	 * which is why nothing is freed until the queue is off wq_list and
++	 * its lists are empty.
+ 	 */
+-	list_for_each_entry(w, &wq->workers, list)
+-		kthread_stop(w->task);
+-
+ 	pthread_mutex_lock(&wq_lock);
+ 	list_del(&wq->list);
++	list_splice_init(&wq->dead_workers, &stopping);
++	list_splice_init(&wq->workers, &stopping);
+ 	pthread_mutex_unlock(&wq_lock);
+ 
+-	list_for_each_entry_safe(w, n, &wq->workers, list)
++	list_for_each_entry_safe(w, n, &stopping, list) {
++		if (w->task)
++			kthread_stop(w->task);
+ 		kfree(w);
++	}
+ 
+ 	kfree(wq);
+ }
+@@ -462,6 +518,7 @@ struct workqueue_struct *alloc_workqueue(const char *fmt,
+ 	INIT_LIST_HEAD(&wq->list);
+ 	INIT_LIST_HEAD(&wq->pending_work);
+ 	INIT_LIST_HEAD(&wq->workers);
++	INIT_LIST_HEAD(&wq->dead_workers);
+ 
+ 	va_start(args, max_active);
+ 	vsnprintf(wq->name, sizeof(wq->name), fmt, args);

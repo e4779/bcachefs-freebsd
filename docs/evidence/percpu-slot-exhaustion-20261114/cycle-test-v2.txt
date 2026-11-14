@@ -1,0 +1,6 @@
+daemon pid: 29893
+threads BEFORE burst: total=29 unbound=1
+threads AT PEAK: total=44 unbound=1
+threads AFTER 30s idle: total=32 unbound=1
+DAEMON ALIVE AFTER CYCLE
+cycle done

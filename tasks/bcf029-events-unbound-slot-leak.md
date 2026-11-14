@@ -1,7 +1,7 @@
 ---
 id: "bcf029"
 title: "events_unbound worker leak: percpu slots not freed on exit"
-status: pending
+status: in-progress
 priority: critical
 effort: medium
 dependencies: ["bcf028"]
