@@ -1,7 +1,7 @@
 ---
 id: "bcf026"
 title: "Standards distillation: cberner/fuser (Rust side) → pi-topic"
-status: pending
+status: in-review
 priority: high
 effort: medium
 type: chore
@@ -36,9 +36,9 @@ Distill "how to write a mergeable PR for cberner/fuser". The Rust userspace side
 
 ## Acceptance Criteria (DoD = pi-topics)
 
-- [ ] 1–2 stable pi-topics with receipts (file/line or API dump as evidence, not a paraphrase), triggers for recall set.
-- [ ] Nothing-derivable rule: topics hold distilled conclusions + pointers; raw material stays in the corpus.
-- [ ] A PR-writer checklist for bcf014, derivable from the topics.
+- [x] Two stable pi-topics created (2026-11-14, receipts = file:line/CI-config/PR numbers, triggers set): `fuser-rust-code-standards` (style gate = CI not configs; error layering; session.rs real-mount test canon; FreeBSD VM job) and `fuser-pr-landscape-closed` (PR door CLOSED 2026-07-17 — plan-changing; strategy issue-first/Kent).
+- [x] Nothing-derivable: topics hold conclusions + pointers; distillate persisted as corpus `distill-bcf026.md`, raw in `raw/live-2026-11-14-corpus4/`.
+- [x] PR-writer checklist for bcf014: 12 points in `fuser-rust-code-standards` (channel-first caveat: door closed — checklist applies when/if the door reopens).
 
 ## Source
 

@@ -13,6 +13,8 @@ cancelled_at: 2026-11-13
 
 # amuled: вернуть svcj после стабилизации
 
+CANCELLED 2026-11-13 — absorbed into bcf002; RESPLIT 2026-11-14 (task-writer review: different gates/fail modes than qbt) — the live successor is **bcf027-amuled-svcj-return** (this tombstone feeds it via dep).
+
 amuled_svcj=NO временно (2026-11-06, утренний хаос был мусором обёрток, не svcj; но при чистом состоянии проверяем сначала вручную).
 
 ## Source

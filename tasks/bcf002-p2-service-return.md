@@ -1,6 +1,6 @@
 ---
 id: "bcf002"
-title: "P2: return of deferred services after the stabilization package (qbt, amuled svcj)"
+title: "P2: qbt return with staggered fastresume (+ f3-heal sunset)"
 status: pending
 priority: medium
 effort: medium
@@ -9,24 +9,30 @@ tags: [ops, soak]
 created_at: 2026-11-13
 ---
 
-# P2: return of deferred services after the stabilization package (qbt, amuled svcj)
+# P2: qbt return with staggered fastresume (+ f3-heal sunset)
 
 ## Objective
 
-After P1a (bcf001) + P3b (bcf024) land, return to prod what was removed for the sake of stabilization. Hard fact: a qbt restart = 3/3 livelock — the "retry fix will help" premise is unproven until bcf001 lands. f3-heal is deployed and validated (fact, details in the git journal) — the open part of the task is only the service return and the sunset.
+After P1a (bcf001) + P3b (bcf024) land, bring qbt back to prod. Hard
+fact: a qbt restart = 3/3 livelock — the "retry fix will help"
+premise is unproven until bcf001 lands. amuled svcj return is a
+SEPARATE deliverable now: tasks/bcf027-amuled-svcj-return.md (split
+by task-writer review 2026-11-14 — different gates, different fail
+modes; tombstone bcf006 feeds bcf027).
 
 ## Tasks
 
-- [ ] qbt back into the boot chain with staggered fastresume (bcf024).
-- [ ] amuled back under svcj (absorbed from bcf006; autostart).
+- [ ] qbt back into the boot chain with staggered fastresume
+      (bcf024 mechanics).
 - [ ] f3-heal sunset criterion: formulate and write it down.
 
 ## Acceptance Criteria
 
 - [ ] qbt 48h: zero wedges, poolwatch perr=0.
-- [ ] amuled runs jailed (svcj), survives a reboot.
-- [ ] f3-heal sunset recorded (proposal: 2 weeks without incidents → remove or keep — owner's call).
+- [ ] f3-heal sunset recorded (proposal: 2 weeks without incidents →
+      remove or keep — owner's call).
 
 ## Source
 
-Runbook council 2026-11-06; bcf006 (absorbed, cancelled).
+Runbook council 2026-11-06; split per task-writer review 2026-11-14
+(C1: different gates and fail modes; amuled = bcf027).
