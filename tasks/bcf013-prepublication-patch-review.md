@@ -1,7 +1,7 @@
 ---
 id: "bcf013"
 title: "Pre-publication review of the port patches: overlay 001–070 + kernel patches, gate before the upstream PR"
-status: pending
+status: in-review
 priority: high
 effort: large
 type: chore
@@ -38,6 +38,25 @@ A worker does not judge itself: review is a separate look (a verifier subagent o
 
 - For every patch on the PR track: a verdict "fit / fixes / not sending" in the journal.
 - All "fixes" closed, the tree builds, apply.sh runs from a clean clone.
+
+## Gate verdict (2026-11-14, delivered)
+
+Council converged (pass 1 + pass 2 cross-exam, all three seats):
+full memo docs/notes/council-memo-bcf013-kernel-2026-11-14.md.
+Verdicts:
+- fuse_io-etimedout-fail-fast → REWORK (3 edits: drop B_EINTR,
+  extend :669-672 check, rewrite comment) then SUBMIT. Commit draft
+  ready (style pass-2).
+- fuse_ipc-deadline-cap → NOT SENDABLE as-is; demoted from bcf005
+  to receipts (no-op without intr; qbittorrent story probably
+  misattributed; daemon_timeout=0 blocker). Survival path:
+  intr-only reframe + guard + dtrace + receipts, or defer.
+- Cross-cutting: two PRs, fresh-main git-diff packaging (current
+  /root-backup diffs won't apply), DCO, checkstyle9=0 gate, tests
+  TEST2/TEST3/TEST1, transit-probe of timeout= before PR text.
+- Live-mine escalation recorded (owner decision pending):
+  /boot/kernel/fusefs.ko carries the unguarded cap; next reboot =
+  ETIMEDOUT storm at timeout=0.
 
 ## Source
 
