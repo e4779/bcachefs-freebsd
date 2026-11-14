@@ -1,19 +1,21 @@
 ---
 id: "bcf025"
-title: "cron-USR1: pending-scan drainage automation — owner GO/NO-GO"
-status: pending
+title: "cron-USR1 drain automation - GO/NO-GO decision (deferred until rw_pend alert fires)"
+status: blocked
 priority: medium
 effort: small
-dependencies: []
+dependencies: ["bcf030"]
 tags: [ops, decision]
 created_at: 2026-11-13
 ---
 
-# cron-USR1: drainage automation — owner GO/NO-GO
+# cron-USR1 drain automation - GO/NO-GO decision (deferred until rw_pend alert fires)
 
 ## Objective
 
 SIGUSR1 drainage is confirmed live (bcf012: 144M→18.8M sectors, ~240MB/s); currently manual `kill -USR1 <pid>` only. The decision: whether to put a periodic pending-scan on cron. This is an owner decision (the prod machine's risk profile), not code.
+
+DEFERRED (owner decision 2026-11-14, live data rw_pend=0 on the fresh daemon): the decision activates when the rw_pend threshold alert (bcf030) first fires — until pending actually grows under load, automation is churn on an empty queue. The root fix remains bcf012 (park conditions).
 
 ## Tasks
 
