@@ -1,12 +1,13 @@
 ---
 id: "bcf031"
 title: "Council #2: review the reworked bcf005 artifacts (inverse fuse_io + tests) before submission"
-status: in-progress
+status: completed
 priority: high
 effort: medium
 dependencies: []
 tags: ["review", "council", "kernel"]
 created_at: 2026-11-14
+completed_at: 2026-11-14
 ---
 
 # Council #2: review the reworked bcf005 artifacts (inverse fuse_io + tests) before submission
