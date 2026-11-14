@@ -2,8 +2,7 @@
 
 Engineering project: port of bcachefs-tools + FUSE frontend to
 FreeBSD. Operational context (prod bridge, scars, measurements)
-lives in the homelab repo — do not duplicate it here. Public repo:
-https://github.com/e4779/bcachefs-freebsd
+lives in the homelab repo — do not duplicate it here.
 
 ## Hard constants (council, runbook 18 §8)
 
