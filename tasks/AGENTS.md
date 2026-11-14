@@ -129,14 +129,24 @@ Run `taskmd validate` before committing to check for missing fields, invalid val
 
 ## Task Review
 
-Before committing new or restructured tasks, run the project reviewer
-subagent (`.pi/agents/task-reviewer.md`, read-only): it enforces
-right-sizing (one task = one testable deliverable), anti-slop
-(chronicle lives in the git journal, not task bodies), verifiable AC,
-real-gating deps.
+Pipeline (writer -> orchestrator commit -> reviewer -> accept):
+
+1. `task-writer` (`.pi/agents/`) drafts new/restructured tasks
+   (EN, one testable deliverable, OUTCOME-level ACs).
+2. Orchestrator reviews the diff and commits.
+3. `task-reviewer` (`.pi/agents/`) audits drafts (C1-C5) and
+   accepts finished tasks by outcome-testing every AC.
+4. Fix loop between writer and reviewer; accept closes routine
+   tasks. Owner-decision tasks (GO/NO-GO, publications, prod)
+   escalate to the owner instead.
+
+AC doctrine: every AC must FAIL if the deliverable is bad —
+process-completion checkboxes are not ACs. Canon:
+https://driangle.github.io/taskmd/guide/best-practices.html#writing-good-tasks
 
 ```bash
-subagent({agent:"task-reviewer", async:true, task:"Review tasks/bcf[0-9]*.md. Return contract JSON."})
+subagent({agent:"task-writer", async:true, task:"Create task: <spec>."})
+subagent({agent:"task-reviewer", async:true, task:"Audit draft / accept bcfNNN against its ACs. Return contract JSON."})
 ```
 
 Run with `async: true` — foreground children do not load the toolset
