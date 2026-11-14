@@ -1,8 +1,9 @@
 # Working with Taskmd Tasks
 
 **Task language: English** (owner decision 2026-11-13 — repo is public,
-no RU↔EN ping-pong). Chat/runbook prose stays Russian; task files,
-commit subjects and bodies are English.
+no RU↔EN ping-pong). Chat stays Russian. Project-wide process
+(task pipeline, personas, structured-text convention) lives in the
+root AGENTS.md — this file holds only store-local facts.
 
 This project uses [taskmd](https://github.com/driangle/taskmd) for task management. Tasks are markdown files with YAML frontmatter. See `TASKMD_SPEC.md` for the full field reference.
 
@@ -126,48 +127,6 @@ Write entries when starting, making key decisions, hitting blockers, or finishin
 ## Validation
 
 Run `taskmd validate` before committing to check for missing fields, invalid values, duplicate IDs, circular dependencies, and broken references.
-
-## Task pipeline
-
-```mermaid
-flowchart LR
-    W[task-writer<br/>draft] --> O[orchestrator<br/>commit draft]
-    O --> V[work-verifier<br/>outcome tests<br/>findings list]
-    V -->|findings| D{orchestrator}
-    D -->|failed| W
-    D -->|verified| X[task completed]
-    D -.owner-decision.-> OW[owner]
-```
-
-1. `task-writer` (`.pi/agents/`) drafts new/restructured tasks
-   (EN, one testable deliverable, OUTCOME-level ACs).
-2. Orchestrator reviews the diff and commits the draft.
-3. `work-verifier` (`.pi/agents/`) outcome-tests every AC and
-   returns a findings LIST — verified / failed / untestable. It
-   does not decide; the orchestrator closes or loops the task.
-4. Owner-decision tasks (GO/NO-GO, publications, prod) skip the
-   verifier: they escalate to the owner.
-
-Structured-text convention (applies to AGENTS.md, persona prompts,
-SKILL.md): sections are an OPEN set with stable vocabulary
-(invariants / live truth / recipes / workflows / pointers); a
-mermaid diagram where it beats a paragraph; inline the MUST-KNOW
-(agents do not study pointers) — pointers only for optional depth;
-plain-text cross-refs "(see <section>)". AC canon:
-https://driangle.github.io/taskmd/guide/best-practices.html#writing-good-tasks
-
-```bash
-subagent({agent:"task-writer", async:true, task:"Create task: <spec>."})
-subagent({agent:"work-verifier", async:true, task:"Verify bcfNNN against its ACs. Return the findings list."})
-```
-
-Run with `async: true` — foreground children do not load the toolset
-(lesson 2026-11-13: profile tools allowlist stays unavailable in
-foreground; background inherits the contour default).
-
-Post-run falsifier: `git status --porcelain tasks/` must be empty —
-the verifier never mutates. It verifies facts with commands and shows
-the check it ran.
 
 ## Reference
 
