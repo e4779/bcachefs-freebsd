@@ -4,7 +4,7 @@ title: "Pool health monitoring: utility landscape and what to port"
 status: pending
 priority: medium
 effort: large
-dependencies: []
+dependencies: ["bcf012"]
 tags: ["telemetry", "research"]
 created_at: 2026-11-13
 ---
@@ -20,6 +20,9 @@ Related: bcf030 (rw_pend threshold alert in poolwatch.sh — the immediate
 stopgap; this landscape's verdict decides its fate: keep as the poolwatch
 stopgap or fold into the chosen monitor). Related: bcf004 (P4 telemetry —
 the A+ snapshot ring is a data source any monitor would read).
+GATE NOTE (owner evidence-gating pattern): the landscape VERDICT consumes
+bcf012's park-conditions map as a core input — a monitor verdict that
+ignores the known park symptom is incomplete; hence the dependency.
 
 Context: hmlb-007 (homelab) cancelled — legacy-hlmon (a Rust dashboard of the Debian
 era, the sources on the thinkpad, described in homelab `docs/debian/23-hlmon.md`)
