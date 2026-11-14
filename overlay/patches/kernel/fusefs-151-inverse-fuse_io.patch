@@ -1,0 +1,84 @@
+diff --git a/sys/fs/fuse/fuse_io.c b/sys/fs/fuse/fuse_io.c
+--- a/sys/fs/fuse/fuse_io.c
++++ b/sys/fs/fuse/fuse_io.c
+ 	                 * if its actually written out.)
+ 	                 */
+ 			SDT_PROBE2(fusefs, , io, write_biobackend_issue, 0, bp);
+-			bwrite(bp);
+-			if (bp->b_error == EINTR) {
+-				err = EINTR;
++			err = bwrite(bp);
++			if (err == EINTR || err == ETIMEDOUT)
+ 				break;
+-			}
+ 			goto again;
+ 		}
+ 		err = uiomove((char *)bp->b_data + on, n, uio);
+@@ -893,6 +891,42 @@
+ 			error = fuse_write_directbackend(vp, uiop, cred, fufh,
+ 				filesize, 0, pages);
+ 
++	/*
++	 * fusefs: report daemon timeouts to sync writers as ETIMEDOUT
++	 *
++	 * When the FUSE daemon misses a full timeout window, fuse_io_strategy
++	 * redirties the buffer and sets B_EINTR, so bufwait(9) reports EINTR
++	 * to synchronous writers, masking the real errno (B_EINTR is checked
++	 * before BIO_ERROR).
++	 *
++	 * Keep the dirty data and record the failure with BIO_ERROR and
++	 * b_error = ETIMEDOUT, without B_EINTR.  Effects by I/O path:
++	 *
++	 * - IO_SYNC writes: synchronous bwrite(9) callers now get ETIMEDOUT
++	 *   instead of a bogus EINTR after one timeout window.  This is the
++	 *   only errno inversion.
++	 * - Discontiguous appends: fuse_write_biobackend previously flushed
++	 *   through a goto again loop that never observed the timeout (no
++	 *   b_error was recorded on the buffer) and the write never returned;
++	 *   it now breaks out and returns ETIMEDOUT to the writer after one
++	 *   window.
++	 * - fsync(2): vn_fsync_buf previously re-flushed until maxretry
++	 *   (10000) flush passes were exhausted, each pass delayed a full
++	 *   timeout window, and finally returned EAGAIN; it now reports
++	 *   ETIMEDOUT after a single pass, because the final scan reads the
++	 *   recorded b_error of the still-dirty buffer, which brelse(9)'s
++	 *   redirty scrub leaves intact.
++	 *
++	 * Reads that require read-modify-write already returned ETIMEDOUT
++	 * before this change and are unaffected.  Async buffers are redirtied
++	 * and retried by the flusher as before.  A writer whose daemon stays
++	 * unresponsive now observes the timeout instead of hanging in the
++	 * flush path.
++	 *
++	 * This intentionally changes the errno seen by synchronous IO_SYNC
++	 * writers on daemon timeout from EINTR to ETIMEDOUT.
++	 *
++	 */
+ 			if (error == EINTR) {
+ 				bp->b_flags &= ~(B_INVAL | B_NOCACHE);
+ 				if ((bp->b_flags & B_PAGING) == 0) {
+@@ -902,15 +936,6 @@
+ 				if ((bp->b_flags & B_ASYNC) == 0)
+ 					bp->b_flags |= B_EINTR;
+ 			} else if (error == ETIMEDOUT) {
+-				/*
+-				 * Daemon unresponsive for a full timeout window.
+-				 * Fail back to the client instead of redirtying and
+-				 * trusting the buf daemon to re-drive: observed
+-				 * (bcachefs FUSE, 2026-11) a redirtied buffer may
+-				 * never complete, wedging the client forever.  Keep
+-				 * the dirty data (no B_INVAL) so later writes retry;
+-				 * the caller sees ETIMEDOUT and retries itself.
+-				 */
+ 				bp->b_flags &= ~(B_INVAL | B_NOCACHE);
+ 				if ((bp->b_flags & B_PAGING) == 0) {
+ 					bdirty(bp);
+@@ -918,8 +943,6 @@
+ 				}
+ 				bp->b_ioflags |= BIO_ERROR;
+ 				bp->b_error = ETIMEDOUT;
+-				if ((bp->b_flags & B_ASYNC) == 0)
+-					bp->b_flags |= B_EINTR;
+ 			} else {
+ 				if (error) {
+ 					bp->b_ioflags |= BIO_ERROR;
