@@ -6,7 +6,7 @@ priority: high
 effort: medium
 type: chore
 tags: [upstream, kernel]
-dependencies: ["bcf013"]
+dependencies: ["bcf013", "bcf031"]
 created_at: 2026-11-13
 context: [docs/f3-runbook.org, overlay/patches/kernel/]
 ---
