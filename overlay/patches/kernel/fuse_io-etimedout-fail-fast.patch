@@ -1,20 +1,22 @@
 diff --git a/sys/fs/fuse/fuse_io.c b/sys/fs/fuse/fuse_io.c
-index c4fbb2635..42c909c91 100644
+index c4fbb2635..8197e1de8 100644
 --- a/sys/fs/fuse/fuse_io.c
 +++ b/sys/fs/fuse/fuse_io.c
-@@ -667,8 +667,9 @@ fuse_write_biobackend(struct vnode *vp, struct uio *uio,
+@@ -666,11 +666,9 @@ fuse_write_biobackend(struct vnode *vp, struct uio *uio,
+ 	                 * if its actually written out.)
  	                 */
  			SDT_PROBE2(fusefs, , io, write_biobackend_issue, 0, bp);
- 			bwrite(bp);
+-			bwrite(bp);
 -			if (bp->b_error == EINTR) {
 -				err = EINTR;
-+			if (bp->b_error == EINTR ||
-+			    bp->b_error == ETIMEDOUT) {
-+				err = bp->b_error;
++			err = bwrite(bp);
++			if (err == EINTR || err == ETIMEDOUT)
  				break;
- 			}
+-			}
  			goto again;
-@@ -893,15 +894,35 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
+ 		}
+ 		err = uiomove((char *)bp->b_data + on, n, uio);
+@@ -893,15 +891,37 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
  			error = fuse_write_directbackend(vp, uiop, cred, fufh,
  				filesize, 0, pages);
  
@@ -41,7 +43,9 @@ index c4fbb2635..42c909c91 100644
 +				 * errno.  brelse(9) clears BIO_ERROR when it
 +				 * redirties a failed write but leaves
 +				 * b_error, so fsync(2)'s final scan of dirty
-+				 * buffers still reports ETIMEDOUT.
++				 * buffers still reports ETIMEDOUT.  The
++				 * write path consumes bwrite(9)'s return
++				 * value, not b_error.
 +				 */
 +				bp->b_flags &= ~(B_INVAL | B_NOCACHE);
 +				if ((bp->b_flags & B_PAGING) == 0) {
