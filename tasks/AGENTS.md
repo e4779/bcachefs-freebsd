@@ -127,26 +127,38 @@ Write entries when starting, making key decisions, hitting blockers, or finishin
 
 Run `taskmd validate` before committing to check for missing fields, invalid values, duplicate IDs, circular dependencies, and broken references.
 
-## Task Review
+## Task pipeline
 
-Pipeline (writer -> orchestrator commit -> reviewer -> accept):
+```mermaid
+flowchart LR
+    W[task-writer<br/>draft] --> O[orchestrator<br/>commit draft]
+    O --> V[work-verifier<br/>outcome tests<br/>findings list]
+    V -->|findings| D{orchestrator}
+    D -->|failed| W
+    D -->|verified| X[task completed]
+    D -.owner-decision.-> OW[owner]
+```
 
 1. `task-writer` (`.pi/agents/`) drafts new/restructured tasks
    (EN, one testable deliverable, OUTCOME-level ACs).
-2. Orchestrator reviews the diff and commits.
-3. `task-reviewer` (`.pi/agents/`) audits drafts (C1-C5) and
-   accepts finished tasks by outcome-testing every AC.
-4. Fix loop between writer and reviewer; accept closes routine
-   tasks. Owner-decision tasks (GO/NO-GO, publications, prod)
-   escalate to the owner instead.
+2. Orchestrator reviews the diff and commits the draft.
+3. `work-verifier` (`.pi/agents/`) outcome-tests every AC and
+   returns a findings LIST — verified / failed / untestable. It
+   does not decide; the orchestrator closes or loops the task.
+4. Owner-decision tasks (GO/NO-GO, publications, prod) skip the
+   verifier: they escalate to the owner.
 
-AC doctrine: every AC must FAIL if the deliverable is bad —
-process-completion checkboxes are not ACs. Canon:
+Structured-text convention (applies to AGENTS.md, persona prompts,
+SKILL.md): sections are an OPEN set with stable vocabulary
+(invariants / live truth / recipes / workflows / pointers); a
+mermaid diagram where it beats a paragraph; inline the MUST-KNOW
+(agents do not study pointers) — pointers only for optional depth;
+plain-text cross-refs "(see <section>)". AC canon:
 https://driangle.github.io/taskmd/guide/best-practices.html#writing-good-tasks
 
 ```bash
 subagent({agent:"task-writer", async:true, task:"Create task: <spec>."})
-subagent({agent:"task-reviewer", async:true, task:"Audit draft / accept bcfNNN against its ACs. Return contract JSON."})
+subagent({agent:"work-verifier", async:true, task:"Verify bcfNNN against its ACs. Return the findings list."})
 ```
 
 Run with `async: true` — foreground children do not load the toolset
@@ -154,7 +166,7 @@ Run with `async: true` — foreground children do not load the toolset
 foreground; background inherits the contour default).
 
 Post-run falsifier: `git status --porcelain tasks/` must be empty —
-the reviewer never mutates. It audits facts with commands and shows
+the verifier never mutates. It verifies facts with commands and shows
 the check it ran.
 
 ## Reference
