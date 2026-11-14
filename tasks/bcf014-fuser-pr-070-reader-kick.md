@@ -32,7 +32,7 @@ An upstream PR with a liveness fix: FreeBSD delivers FUSE_DESTROY to exactly ONE
 
 - PR opened, the link recorded into the task (`--add-pr`), CI/feedback tracked.
 
-Corpus: docs/notes/upstream-corpus-2026-11-13/ + topics (maintainer-tone-fuser-fusefs-2026-11 — the upstream tone, freebsd-contribution-path-2026-11).
+Corpus: docs/notes/upstream-corpus-2026-11-13/ + topics (maintainer-tone-fuser-fusefs-2026-11 — the upstream tone, freebsd-contribution-path-2026-11, **fuser-pr-landscape-closed** — cberner PR door CLOSED since 2026-07-17: route = issue-first / Kent coordination; fuser-rust-code-standards — the 12-point checklist for if/when the door reopens).
 
 ## Council dry-run findings (2026-11-14) — merge into PR prep
 
