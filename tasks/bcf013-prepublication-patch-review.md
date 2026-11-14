@@ -1,7 +1,7 @@
 ---
 id: "bcf013"
 title: "Pre-publication review of the port patches: overlay 001–070 + kernel patches, gate before the upstream PR"
-status: in-review
+status: completed
 priority: high
 effort: large
 type: chore
@@ -9,6 +9,7 @@ tags: [review, overlay, upstream, kernel]
 dependencies: ["bcf020", "bcf026", "bcf017"]
 created_at: 2026-11-13
 context: [overlay/README.md, overlay/patches/, overlay/patches/kernel/, docs/f3-runbook.org]
+completed_at: 2026-11-14
 ---
 
 # Pre-publication review of the port patches (gate before PR)
