@@ -1,13 +1,14 @@
 ---
 id: "bcf026"
 title: "Standards distillation: cberner/fuser (Rust side) → pi-topic"
-status: in-review
+status: completed
 priority: high
 effort: medium
 type: chore
 dependencies: ["bcf019"]
 tags: ["upstream", "fuser", "research", "knowledge"]
 created_at: 2026-11-14
+completed_at: 2026-11-14
 ---
 
 # Standards distillation: cberner/fuser (Rust side) → pi-topic
