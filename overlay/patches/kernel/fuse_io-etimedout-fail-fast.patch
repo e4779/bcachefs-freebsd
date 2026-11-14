@@ -1,6 +1,20 @@
---- /root/fuse_io.c.orig-backup	2026-11-06 10:42:51.370140000 +0700
-+++ /usr/src/sys/fs/fuse/fuse_io.c	2026-11-06 10:43:26.492341000 +0700
-@@ -893,14 +893,32 @@
+diff --git a/sys/fs/fuse/fuse_io.c b/sys/fs/fuse/fuse_io.c
+index c4fbb2635..42c909c91 100644
+--- a/sys/fs/fuse/fuse_io.c
++++ b/sys/fs/fuse/fuse_io.c
+@@ -667,8 +667,9 @@ fuse_write_biobackend(struct vnode *vp, struct uio *uio,
+ 	                 */
+ 			SDT_PROBE2(fusefs, , io, write_biobackend_issue, 0, bp);
+ 			bwrite(bp);
+-			if (bp->b_error == EINTR) {
+-				err = EINTR;
++			if (bp->b_error == EINTR ||
++			    bp->b_error == ETIMEDOUT) {
++				err = bp->b_error;
+ 				break;
+ 			}
+ 			goto again;
+@@ -893,15 +894,35 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
  			error = fuse_write_directbackend(vp, uiop, cred, fufh,
  				filesize, 0, pages);
  
@@ -14,16 +28,20 @@
 -				if ((error == EINTR || error == ETIMEDOUT) &&
 -				    (bp->b_flags & B_ASYNC) == 0)
 +				if ((bp->b_flags & B_ASYNC) == 0)
-+					bp->b_flags |= B_EINTR;
+ 					bp->b_flags |= B_EINTR;
 +			} else if (error == ETIMEDOUT) {
 +				/*
-+				 * Daemon unresponsive for a full timeout window.
-+				 * Fail back to the client instead of redirtying and
-+				 * trusting the buf daemon to re-drive: observed
-+				 * (bcachefs FUSE, 2026-11) a redirtied buffer may
-+				 * never complete, wedging the client forever.  Keep
-+				 * the dirty data (no B_INVAL) so later writes retry;
-+				 * the caller sees ETIMEDOUT and retries itself.
++				 * The daemon missed a full timeout window.
++				 * Keep the dirty data (no B_INVAL) so the
++				 * write is retried by a later flush, and
++				 * report BIO_ERROR with b_error = ETIMEDOUT
++				 * but not B_EINTR: bufwait(9) checks B_EINTR
++				 * before BIO_ERROR and would report EINTR to
++				 * synchronous callers, masking the real
++				 * errno.  brelse(9) clears BIO_ERROR when it
++				 * redirties a failed write but leaves
++				 * b_error, so fsync(2)'s final scan of dirty
++				 * buffers still reports ETIMEDOUT.
 +				 */
 +				bp->b_flags &= ~(B_INVAL | B_NOCACHE);
 +				if ((bp->b_flags & B_PAGING) == 0) {
@@ -32,7 +50,6 @@
 +				}
 +				bp->b_ioflags |= BIO_ERROR;
 +				bp->b_error = ETIMEDOUT;
-+				if ((bp->b_flags & B_ASYNC) == 0)
- 					bp->b_flags |= B_EINTR;
  			} else {
  				if (error) {
+ 					bp->b_ioflags |= BIO_ERROR;
