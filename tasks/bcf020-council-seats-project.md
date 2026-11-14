@@ -1,13 +1,14 @@
 ---
 id: "bcf020"
 title: "Project-local council-* seats (.pi/agents/): stances for the port review"
-status: in-review
+status: completed
 priority: medium
 effort: medium
 dependencies: ["bcf019"]
 tags: ["skills", "council", "review"]
 created_at: 2026-11-13
 context: ["tasks/bcf013-prepublication-patch-review.md", "tasks/bcf017-council-skill-port.md", "tasks/bcf018-upstream-corpus.md", "tasks/bcf019-quality-standards-research.md"]
+completed_at: 2026-11-14
 ---
 
 # Project-local council-* seats (.pi/agents/)

@@ -24,7 +24,13 @@ Quality gate: no patch goes into an upstream PR (bcf005, bcf014) before an indep
 
 ## Method
 
-The review material comes from the upstream-practices corpus (bcf018) and the quality standards (bcf019 — without them a review is taste, not criteria). The tool — council-mode with the project council-* seats (bcf020): a **mandatory precondition of the gate** — without seats the gate does not open (owner decision 2026-11-13: "how do you review when there is nothing to review with yet" (ru: «как ревьювить, если ещё нечем»)).
+The review material comes from the upstream-practices corpus (bcf018) and the quality standards (bcf019 — without them a review is taste, not criteria). The tool — council-mode with the project council-* seats (bcf020, live
+since 2026-11-14: council-style / council-skeptic / council-
+maintainer / council-ops; council-ops joins only for live-pool
+impact): a **mandatory precondition of the gate** — without seats
+the gate does not open (owner decision 2026-11-13: "how do you
+review when there is nothing to review with yet" (ru: «как
+ревьювить, если ещё нечем»)).
 
 A worker does not judge itself: review is a separate look (a verifier subagent or the owner's second pair of eyes). Verdicts per patch go into the git journal (commits with `Refs: bcf013`), found problems — as fix commits before the PR is sent.
 
