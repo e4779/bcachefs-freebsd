@@ -14,7 +14,7 @@ HEAD, `diff --git a/ b/` format):
 
 ## 1. fuse_io-etimedout-fail-fast — commit message (style pass-2, VERBATIM)
 
-Subject: 60 chars. Intentional EINTR→ETIMEDOUT ABI-visible change is
+Subject: 59 chars (verifier-corrected). Intentional EINTR→ETIMEDOUT ABI-visible change is
 stated in the body. `MFC after: 2 weeks` per council.
 
 ```

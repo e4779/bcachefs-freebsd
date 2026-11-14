@@ -1,7 +1,7 @@
 ---
 id: "bcf005"
 title: "P5: kernel patches fuse_io/fuse_ipc upstream to freebsd-src"
-status: pending
+status: in-progress
 priority: high
 effort: medium
 type: chore
