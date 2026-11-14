@@ -5,7 +5,7 @@ status: pending
 priority: high
 effort: medium
 type: chore
-dependencies: []
+dependencies: ["bcf019"]
 tags: ["upstream", "fuser", "research", "knowledge"]
 created_at: 2026-11-14
 ---
@@ -42,4 +42,10 @@ Distill "how to write a mergeable PR for cberner/fuser". The Rust userspace side
 
 ## Source
 
-maintainer-tone-fuser-fusefs-2026-11 topic + corpus closed100.jsonl; owner decision 2026-11-14 ("не только fusefs — есть ещё fuser").
+Sibling distillation of bcf019 (same corpus, same method, other
+upstream target: cberner/koverstreet instead of the freebsd-src
+kernel). Sources: maintainer-tone-fuser-fusefs-2026-11 topic +
+corpus closed100.jsonl. Wired into the gate chain 2026-11-14: its
+topic feeds the fuser lane of bcf013's council and the bcf014 PR
+prep (owner: "bcf026 hangs in the air and is not linked as part of
+013 - it emerged from 019").

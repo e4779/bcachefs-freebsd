@@ -6,7 +6,7 @@ priority: high
 effort: large
 type: chore
 tags: [review, overlay, upstream, kernel]
-dependencies: ["bcf020"]
+dependencies: ["bcf020", "bcf026"]
 created_at: 2026-11-13
 context: [overlay/README.md, overlay/patches/, overlay/patches/kernel/, docs/f3-runbook.org]
 ---
