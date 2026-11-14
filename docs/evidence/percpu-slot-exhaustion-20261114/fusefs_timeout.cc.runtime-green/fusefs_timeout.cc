@@ -1,0 +1,331 @@
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2026 <Real Name>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS''
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
+ * Tests for reporting FUSE daemon timeouts to clients.
+ *
+ * When the daemon misses a full timeout window, fuse_io_strategy must
+ * keep the buffer dirty but report the error, so that synchronous
+ * callers observe ETIMEDOUT instead of either a bogus EINTR or an
+ * unbounded flush retry loop.  These tests mount with timeout=1 so a
+ * silent daemon trips the timeout in about one second.
+ */
+
+extern "C" {
+#include <fcntl.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+}
+
+#include "mockfs.hh"
+#include "utils.hh"
+
+using namespace testing;
+
+class Timeout: public FuseTest {
+public:
+void SetUp() {
+	m_daemon_timeout = 1;
+	/*
+	 * Without writeback cache every buffered write(2) is IO_SYNC
+	 * (fuse_vnop_write), so the setup writes would themselves hit
+	 * the daemon timeout.  Advertise FUSE_WRITEBACK_CACHE so the
+	 * setup writes stay dirty (delayed) until fdatasync or the
+	 * discontiguous append flushes them - the premise these tests
+	 * are built on.
+	 */
+	m_init_flags |= FUSE_WRITEBACK_CACHE;
+	FuseTest::SetUp();
+}
+
+void expect_lookup(const char *relpath, uint64_t ino)
+{
+	FuseTest::expect_lookup(relpath, ino, S_IFREG | 0644, 0, 1);
+}
+
+void expect_write_success(uint64_t ino)
+{
+	EXPECT_CALL(*m_mock, process(
+		ResultOf([=](auto in) {
+			return (in.header.opcode == FUSE_WRITE &&
+				in.header.nodeid == ino);
+		}, Eq(true)),
+		_)
+	).WillRepeatedly(Invoke(ReturnImmediate([=](auto in, auto& out) {
+		SET_OUT_HEADER_LEN(out, write);
+		out.body.write.size = in.body.write.size;
+	})));
+}
+
+/*
+ * By default the daemon advertises no capabilities, so fsync(2) will
+ * send FUSE_FSYNC after flushing the dirty buffers.  Answer it.
+ */
+void expect_fsync_success(uint64_t ino)
+{
+	EXPECT_CALL(*m_mock, process(
+		ResultOf([=](auto in) {
+			return (in.header.opcode == FUSE_FSYNC &&
+				in.header.nodeid == ino);
+		}, Eq(true)),
+		_)
+	).WillRepeatedly(Invoke(ReturnErrno(0)));
+}
+};
+
+/*
+ * A silent daemon must turn fdatasync(2) into ETIMEDOUT within about
+ * one timeout window, not grind through vn_fsync_buf's retry loop,
+ * which would take maxretry * daemon_timeout.  The buffer must stay
+ * dirty: after the daemon starts answering again, a second fdatasync
+ * must flush the same data successfully.  On an unpatched kernel
+ * the flush completes once the silent-window bound is exhausted
+ * and the errno assertion fails cleanly; without the bound this
+ * test blocks until externally killed.
+ */
+TEST_F(Timeout, fdatasync_etimedout)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	const char *CONTENTS = "abcdefgh";
+	ssize_t bufsize = strlen(CONTENTS);
+	uint64_t ino = 42;
+	int fd;
+	struct timespec start, end;
+	double elapsed;
+
+	expect_lookup(RELPATH, ino);
+	expect_open(ino, 0, 1);
+
+	/*
+	 * The daemon stays silent for the first 20 FUSE_WRITE requests,
+	 * then answers success.  A patched kernel trips ETIMEDOUT on
+	 * the first window; on an unpatched kernel the bound makes the
+	 * flush eventually complete so the errno assertion fails
+	 * cleanly instead of blocking until the runner is killed
+	 * externally.
+	 */
+	unsigned silent_windows = 20;
+	EXPECT_CALL(*m_mock, process(
+		ResultOf([=](auto in) {
+			return (in.header.opcode == FUSE_WRITE &&
+				in.header.nodeid == ino);
+		}, Eq(true)),
+		_)
+	).WillRepeatedly(Invoke([&](auto in, auto &out) {
+		if (silent_windows > 0) {
+			--silent_windows;
+			/* Daemon stays silent this window */
+			return;
+		}
+		std::unique_ptr<mockfs_buf_out> out0(new mockfs_buf_out);
+		out0->header.unique = in.header.unique;
+		SET_OUT_HEADER_LEN(*out0, write);
+		out0->body.write.size = in.body.write.size;
+		out.push_back(std::move(out0));
+	}));
+
+	fd = open(FULLPATH, O_RDWR);
+	ASSERT_LE(0, fd) << strerror(errno);
+	ASSERT_EQ(bufsize, write(fd, CONTENTS, bufsize)) << strerror(errno);
+
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	ASSERT_NE(0, fdatasync(fd));
+	ASSERT_EQ(ETIMEDOUT, errno);
+	clock_gettime(CLOCK_MONOTONIC, &end);
+	elapsed = (end.tv_sec - start.tv_sec) +
+	    (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+	ASSERT_LE(elapsed, 3.0) <<
+		"fdatasync took longer than one timeout window";
+
+	/* Release the daemon.  The buffer should still be dirty. */
+	expect_write_success(ino);
+	expect_fsync_success(ino);
+
+	ASSERT_EQ(0, fdatasync(fd)) << strerror(errno);
+
+	leak(fd);
+}
+
+/*
+ * A discontiguous write within one buffer forces fuse_io_strategy to
+ * flush the already-dirty region synchronously (the hole in between is
+ * deliberately not filled) before continuing.  If the daemon misses a
+ * whole timeout window during that flush, the append lane must report
+ * ETIMEDOUT to the writer instead of retrying the write forever.  The
+ * silent-window bound also keeps this test from hanging on an
+ * unpatched kernel.
+ */
+TEST_F(Timeout, append_lane_etimedout)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	char contents[512];
+	char filler[512];
+	uint64_t ino = 42;
+	int fd;
+	struct timespec start, end;
+	double elapsed;
+
+	expect_lookup(RELPATH, ino);
+	expect_open(ino, 0, 1);
+
+	/*
+	 * The daemon stays silent for the first 20 FUSE_WRITE requests,
+	 * then answers success.  A patched kernel trips ETIMEDOUT on
+	 * the first window; on an unpatched kernel the bound makes the
+	 * flush eventually complete so the errno assertion fails
+	 * cleanly instead of blocking until the runner is killed
+	 * externally.
+	 */
+	unsigned silent_windows = 20;
+	EXPECT_CALL(*m_mock, process(
+		ResultOf([=](auto in) {
+			return (in.header.opcode == FUSE_WRITE &&
+				in.header.nodeid == ino);
+		}, Eq(true)),
+		_)
+	).WillRepeatedly(Invoke([&](auto in, auto &out) {
+		if (silent_windows > 0) {
+			--silent_windows;
+			/* Daemon stays silent this window */
+			return;
+		}
+		std::unique_ptr<mockfs_buf_out> out0(new mockfs_buf_out);
+		out0->header.unique = in.header.unique;
+		SET_OUT_HEADER_LEN(*out0, write);
+		out0->body.write.size = in.body.write.size;
+		out.push_back(std::move(out0));
+	}));
+
+	fd = open(FULLPATH, O_RDWR);
+	ASSERT_LE(0, fd) << strerror(errno);
+	memset(contents, 'a', sizeof(contents));
+	memset(filler, 'b', sizeof(filler));
+	/* Dirty [0, 512).  Delayed write: no FUSE_WRITE is sent yet */
+	ASSERT_EQ((ssize_t)sizeof(contents),
+	    pwrite(fd, contents, sizeof(contents), 0)) << strerror(errno);
+
+	/* Write [1024, 1536), leaving a hole at [512, 1024) */
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	ASSERT_EQ(-1, pwrite(fd, filler, sizeof(filler), 1024));
+	ASSERT_EQ(ETIMEDOUT, errno);
+	clock_gettime(CLOCK_MONOTONIC, &end);
+	elapsed = (end.tv_sec - start.tv_sec) +
+	    (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+	ASSERT_LE(elapsed, 3.0) <<
+		"the append lane retried longer than one timeout window";
+
+	leak(fd);
+}
+
+/*
+ * Recovery on the append lane.  The strategy's timeout branch keeps
+ * the buffer dirty but never clears b_error when a later flush of
+ * that buffer succeeds, so a kernel whose append lane re-reads
+ * b_error after the flush reports a spurious ETIMEDOUT for every
+ * subsequent append on that buffer.  The append lane must consume
+ * bwrite(9)'s return value instead: once the daemon answers again,
+ * the repeated pwrite(2) must succeed.  fdatasync_etimedout does not
+ * cover this: its recovery rides vn_fsync_buf's retry pass, which
+ * scrubs b_error before the flush sees it.  This test exercises the
+ * append lane directly.
+ */
+TEST_F(Timeout, append_after_recovery)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	char contents[512];
+	char filler[512];
+	uint64_t ino = 42;
+	int fd;
+	struct timespec start, end;
+	double elapsed;
+
+	expect_lookup(RELPATH, ino);
+	expect_open(ino, 0, 1);
+
+	/*
+	 * The daemon stays silent for the first 20 FUSE_WRITE requests,
+	 * then answers success.  A patched kernel trips ETIMEDOUT on
+	 * the first window; on an unpatched kernel the bound makes the
+	 * flush eventually complete so the errno assertion fails
+	 * cleanly instead of blocking until the runner is killed
+	 * externally.
+	 */
+	unsigned silent_windows = 20;
+	EXPECT_CALL(*m_mock, process(
+		ResultOf([=](auto in) {
+			return (in.header.opcode == FUSE_WRITE &&
+				in.header.nodeid == ino);
+		}, Eq(true)),
+		_)
+	).WillRepeatedly(Invoke([&](auto in, auto &out) {
+		if (silent_windows > 0) {
+			--silent_windows;
+			/* Daemon stays silent this window */
+			return;
+		}
+		std::unique_ptr<mockfs_buf_out> out0(new mockfs_buf_out);
+		out0->header.unique = in.header.unique;
+		SET_OUT_HEADER_LEN(*out0, write);
+		out0->body.write.size = in.body.write.size;
+		out.push_back(std::move(out0));
+	}));
+
+	fd = open(FULLPATH, O_RDWR);
+	ASSERT_LE(0, fd) << strerror(errno);
+	memset(contents, 'a', sizeof(contents));
+	memset(filler, 'b', sizeof(filler));
+	/* Dirty [0, 512).  Delayed write: no FUSE_WRITE is sent yet */
+	ASSERT_EQ((ssize_t)sizeof(contents),
+	    pwrite(fd, contents, sizeof(contents), 0)) << strerror(errno);
+
+	/* Discontiguous append with a hole: flush trips the timeout */
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	ASSERT_EQ(-1, pwrite(fd, filler, sizeof(filler), 1024));
+	ASSERT_EQ(ETIMEDOUT, errno);
+	clock_gettime(CLOCK_MONOTONIC, &end);
+	elapsed = (end.tv_sec - start.tv_sec) +
+	    (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+	ASSERT_LE(elapsed, 3.0) <<
+		"the append lane retried longer than one timeout window";
+
+	/*
+	 * The daemon recovers.  The repeat write flushes the still-dirty
+	 * region successfully; a kernel reading the stale b_error here
+	 * would report a spurious ETIMEDOUT for this successful write.
+	 */
+	silent_windows = 0;
+	ASSERT_EQ((ssize_t)sizeof(filler),
+	    pwrite(fd, filler, sizeof(filler), 1024)) << strerror(errno);
+
+	leak(fd);
+}

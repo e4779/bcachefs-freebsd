@@ -12,10 +12,10 @@ index 9d63164db..06fbc082c 100644
  GTESTS+=	io
 diff --git a/tests/sys/fs/fusefs/fusefs_timeout.cc b/tests/sys/fs/fusefs/fusefs_timeout.cc
 new file mode 100644
-index 000000000..eac86c5f5
+index 000000000..b923cb8b4
 --- /dev/null
 +++ b/tests/sys/fs/fusefs/fusefs_timeout.cc
-@@ -0,0 +1,313 @@
+@@ -0,0 +1,331 @@
 +/*-
 + * SPDX-License-Identifier: BSD-2-Clause
 + *
@@ -71,6 +71,15 @@ index 000000000..eac86c5f5
 +public:
 +void SetUp() {
 +	m_daemon_timeout = 1;
++	/*
++	 * Without writeback cache every buffered write(2) is IO_SYNC
++	 * (fuse_vnop_write), so the setup writes would themselves hit
++	 * the daemon timeout.  Advertise FUSE_WRITEBACK_CACHE so the
++	 * setup writes stay dirty (delayed) until fdatasync or the
++	 * discontiguous append flushes them - the premise these tests
++	 * are built on.
++	 */
++	m_init_flags |= FUSE_WRITEBACK_CACHE;
 +	FuseTest::SetUp();
 +}
 +
@@ -154,8 +163,11 @@ index 000000000..eac86c5f5
 +			/* Daemon stays silent this window */
 +			return;
 +		}
-+		SET_OUT_HEADER_LEN(out, write);
-+		out.body.write.size = in.body.write.size;
++		std::unique_ptr<mockfs_buf_out> out0(new mockfs_buf_out);
++		out0->header.unique = in.header.unique;
++		SET_OUT_HEADER_LEN(*out0, write);
++		out0->body.write.size = in.body.write.size;
++		out.push_back(std::move(out0));
 +	}));
 +
 +	fd = open(FULLPATH, O_RDWR);
@@ -224,8 +236,11 @@ index 000000000..eac86c5f5
 +			/* Daemon stays silent this window */
 +			return;
 +		}
-+		SET_OUT_HEADER_LEN(out, write);
-+		out.body.write.size = in.body.write.size;
++		std::unique_ptr<mockfs_buf_out> out0(new mockfs_buf_out);
++		out0->header.unique = in.header.unique;
++		SET_OUT_HEADER_LEN(*out0, write);
++		out0->body.write.size = in.body.write.size;
++		out.push_back(std::move(out0));
 +	}));
 +
 +	fd = open(FULLPATH, O_RDWR);
@@ -296,8 +311,11 @@ index 000000000..eac86c5f5
 +			/* Daemon stays silent this window */
 +			return;
 +		}
-+		SET_OUT_HEADER_LEN(out, write);
-+		out.body.write.size = in.body.write.size;
++		std::unique_ptr<mockfs_buf_out> out0(new mockfs_buf_out);
++		out0->header.unique = in.header.unique;
++		SET_OUT_HEADER_LEN(*out0, write);
++		out0->body.write.size = in.body.write.size;
++		out.push_back(std::move(out0));
 +	}));
 +
 +	fd = open(FULLPATH, O_RDWR);
