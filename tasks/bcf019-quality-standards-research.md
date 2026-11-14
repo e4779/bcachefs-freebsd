@@ -1,13 +1,14 @@
 ---
 id: "bcf019"
 title: "FreeBSD code quality standards research, DoD = correct pi-topics"
-status: in-review
+status: completed
 priority: medium
 effort: medium
 dependencies: ["bcf018"]
 tags: ["upstream", "research", "knowledge"]
 created_at: 2026-11-13
 context: ["tasks/bcf018-upstream-corpus.md"]
+completed_at: 2026-11-14
 ---
 
 # FreeBSD code quality standards research → pi-topics
