@@ -4,7 +4,7 @@ title: "events_unbound worker leak: percpu slots not freed on exit"
 status: pending
 priority: critical
 effort: medium
-dependencies: []
+dependencies: ["bcf028"]
 tags: ["port", "kernel", "hotfix"]
 created_at: 2026-11-14
 ---
