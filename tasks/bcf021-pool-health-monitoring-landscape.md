@@ -16,6 +16,11 @@ created_at: 2026-11-13
 An open-ended "think it over" task: how to monitor bcachefs pool health PROPERLY in
 our setup. Not code — an inventory and a verdict.
 
+Related: bcf030 (rw_pend threshold alert in poolwatch.sh — the immediate
+stopgap; this landscape's verdict decides its fate: keep as the poolwatch
+stopgap or fold into the chosen monitor). Related: bcf004 (P4 telemetry —
+the A+ snapshot ring is a data source any monitor would read).
+
 Context: hmlb-007 (homelab) cancelled — legacy-hlmon (a Rust dashboard of the Debian
 era, the sources on the thinkpad, described in homelab `docs/debian/23-hlmon.md`)
 was written against Linux sysfs (`/sys/fs/bcachefs/`: reconcile_blocked,

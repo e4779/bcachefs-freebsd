@@ -40,6 +40,8 @@ trigger is a threshold, not a calendar).
 
 ## Source
 
+Related: bcf021 (pool health monitoring landscape — the strategic verdict will decide this alert's fate: keep as the poolwatch stopgap or fold into the chosen monitor). Related: bcf012 (park conditions — the root cause this alert measures the symptom of).
+
 Owner decision 2026-11-14 (bcf025 deferred until this trigger is
 live; NO-GO-now recommendation based on rw_pend=0 live data). The
 fuse daemon pid discovery: `pgrep -f '/mnt/pool'`; SIGINFO write
