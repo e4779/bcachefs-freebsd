@@ -1,7 +1,7 @@
 ---
 id: "bcf020"
 title: "Project-local council-* seats (.pi/agents/): stances for the port review"
-status: pending
+status: in-review
 priority: medium
 effort: medium
 dependencies: ["bcf019"]
@@ -32,9 +32,17 @@ Project (not user) councilor profiles for council-mode — for the review of thi
 
 ## Acceptance Criteria
 
-- [ ] `subagent({action:"list"})` sees the seats; council-mode runs without the fallback oracle.
-- [ ] The dry-run memo attached to the journal (Refs: bcf020).
-- [ ] The stances committed (`.pi/agents/` force-added against the gitignore), they survive a move via git.
+- [x] `subagent({action:"list"})` sees the seats — proven: pass 1
+      ran all three seats as children; council-mode ran without the
+      fallback oracle.
+- [x] Dry-run memo attached to the journal:
+      docs/notes/council-dryrun-070-memo-2026-11-14.md (pass 1 +
+      cross-exam on patch 070; findings folded into bcf014;
+      corpus stat erratum found and fixed).
+- [x] The stances committed (`.pi/agents/` force-added against the
+      gitignore; commit 63bcec5), they survive a move via git.
+
+Status note: awaiting owner glance on the memo → completed.
 
 ## Source
 

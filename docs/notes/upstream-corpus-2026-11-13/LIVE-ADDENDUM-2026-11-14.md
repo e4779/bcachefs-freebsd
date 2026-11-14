@@ -16,3 +16,4 @@
 **5. lists.freebsd.org — НЕ НАЙДЕНО.** freebsd-bugs 2026-November (166 msg): только зеркало нашего 300130 (5 сообщений 05–07 Nov от bugzilla-noreply); зеркала 300475/300480 в списке **нет**. freebsd-hackers / -current / -fs за Oct+Nov 2026: 0 совпадений по «4779» / Ермаков / bhyve-uart-темам (pipermail-индексы `lists.freebsd.org/archives/<list>/2026-October|November/`, сняты 2026-11-14).
 
 **Гэпы-хвосты:** D54366 требует логин (Conduit без токена пуст); The Register за human-verification gate; REST quicksearch не ищет по телам комментариев — комментарийный уровень закрыт только поисковыми сниппетами (2 zai-запроса), остаточный риск «дубль, у которого слово только в комментарии» мал, но не ноль.
+ERRATUM 2026-11-14: "смержено лишь 6 (stepancheg×6...)" — miscount, see CORPUS.md erratum; 11/29 = 38%.

@@ -108,3 +108,5 @@ Receipts: `/tmp/fbsd-ai/c300130.txt` / `c300475.txt` / `bz300475.json` / `c30048
 3. **fuser#757**: ISSUE третьего лица (painhardcore), 0 комментариев, тишина 5+ недель; реализация в форке автора. Статистика cberner (последние 100 closed): 71 self-merge, 29 внешних, смержено 6; #692 syncfs отклонён (потом сам #738), #645/#688 отклонены; koverstreet/fuser — 0 PR за всю историю. Паттерн: аддитивное берут, семантику reply/unmount — нет.
 4. **AI-policy live**: main CONTRIBUTING.md МЯГЧЕ stable/15 — reject только «without substantial human review and validation» + анти-train оговорка; жёсткий шаблон с main ушёл; D54817 стагнирует с 2026-04-27; D54366 login-gated (гэп).
 5. **lists.freebsd.org**: по bhyve-эре владельца не найдено (только зеркало 300130 в freebsd-bugs Nov).
+
+ERRATUM 2026-11-14 (skeptic audit): "смержено лишь 6" неверно — это число РАЗНЫХ авторов; фактически 11/29 внешних PR смержено (38%): stepancheg ×6 (#641/642/643/644/646/647) + #660 Popax21, #667 AM5800, #680 mhambre, #683 AlessandroBono, #695 glamberson. Authoritative: pi-topic maintainer-tone-fuser-fusefs-2026-11 + closed100.jsonl.

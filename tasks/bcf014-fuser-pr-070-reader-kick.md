@@ -34,6 +34,34 @@ An upstream PR with a liveness fix: FreeBSD delivers FUSE_DESTROY to exactly ONE
 
 Corpus: docs/notes/upstream-corpus-2026-11-13/ + topics (maintainer-tone-fuser-fusefs-2026-11 — the upstream tone, freebsd-contribution-path-2026-11).
 
+## Council dry-run findings (2026-11-14) — merge into PR prep
+
+Full memo: docs/notes/council-dryrun-070-memo-2026-11-14.md (pass 1
++ cross-exam, seats council-style/skeptic/maintainer). Converged:
+
+1. MERGE PRECONDITION — one-line amend to 070: top-of-loop
+   `session_dead` check (Acquire) in `receive_session_aware` before
+   `receive` (channel.rs:66-67 insert); flag = source of truth,
+   SIGURG only wakes readers already in read(2). State the
+   invariant in the commit message.
+2. SOLE REMAINING PR BLOCKER — SIGURG disposition hygiene:
+   cfg(freebsd) gate + oldact save/verify (warn on foreign handler)
+   or Config opt-in (session.rs:297, 522-530).
+3. FRAMING KIT: koverstreet/fuser ONLY; #757 = one neutral
+   technical cross-ref + "does not change reply ordering"
+   disclaimer (Kent audience); grievance/momentum claims banned;
+   evidence language cites POSIX sigaction (no SA_RESTART ⇒ EINTR);
+   n=1 live fire is confirmation, not proof.
+4. TEST STORY: in-CI Linux /dev/fuse flag/EINTR unit
+   (drop_waits_for_destroy harness); out-of-CI FreeBSD interleaving
+   repro (magic-path slow-dispatch, n>=3 + idle control arm —
+   skeptic's outcome table in the memo); state CI-infeasibility
+   honestly.
+5. MECHANICAL GATES: cargo fmt --check + clippy; pin b1a110f in
+   corpus and PR text; name the fork rev targeted; strip non-070
+   items from the diff (writev-retry channel.rs:117-145,
+   SessionACL::to_mount_option, n_threads lift).
+
 ## Source
 
 docs/f3-runbook.org:14 "070 is not in koverstreet/fuser" (ru: «070 не в koverstreet/fuser»); owner decision 2026-11-13 (the publication track).
