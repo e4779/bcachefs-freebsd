@@ -54,8 +54,13 @@ Before sending: verify against current main fuse_ipc.c/fuse_io.c (our /usr/src 1
 
 ## Acceptance Criteria
 
-- [ ] PR opened on freebsd-src, the number recorded into the task (`taskmd set bcf005 --add-pr <url>`).
-- [ ] CI/maintainer feedback tracked, fixes sent. The PR description carries the project link https://github.com/e4779/bcachefs-freebsd (prod dogfooding as motivation). Companion bug report — bcf015.
+- [x] Submission opened on freebsd-src upstream, the number recorded into the task:
+  **bug 300785** (https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=300785, filed
+  2026-11-15 together with bcf015 per the bugzilla-first strategy; the fix rides as
+  attachment 277313, tests as 277314). A GitHub PR opens ONLY if triage asks for it.
+- [ ] Triager/maintainer feedback tracked, fixes sent as bug comments/attachments.
+  Companion bug report: bcf015 (same bug - the report and the fix travel together,
+  PR 300130 precedent).
 
 Corpus: docs/notes/upstream-corpus-2026-11-13/ + topics (freebsd-ai-policy-status-2026-11, freebsd-contribution-path-2026-11, maintainer-tone-fuser-fusefs-2026-11).
 
