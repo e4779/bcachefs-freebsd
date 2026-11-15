@@ -26,10 +26,10 @@
   гайда problem-reports), plain text без разметки (без бэктиков/**),
   ASCII, строки <=76, патчи только аттачментами (guide: quoted-printable
   убивает inline-диффы).
-- Синтаксис кросс-ссылок bugzilla (автолинки в интерфейсе): `bug #N`
-  (другой баг), `comment #N` (комментарий этого бага),
-  `bug #N, comment #N` (чужой комментарий), `base rN` / `ports rN` /
-  `doc rN` (SVN-коммиты), `review DN` (Phabricator). Ссылки на внешние
+- Синтаксис кросс-ссылок bugzilla (автолинки) — НЕ из памяти, а из живого
+  шаблона: gh api repos/freebsd/bugzilla/contents/template/en/custom/global/textarea.html.tmpl
+  --jq '.content' | base64 -d | grep -B1 -A2 'To link'  (пример: bug #N,
+  comment #N, bug #N, comment #N, base rN, review DN). Ссылки на внешние
   файлы — pin-SHA blob URL целиком (URL не ломать).
 
 ---
