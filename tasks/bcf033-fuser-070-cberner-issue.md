@@ -6,7 +6,7 @@ priority: high
 type: chore
 tags: [upstream, fuser, issue]
 created_at: "2026-11-15"
-dependencies: ["bcf014", "bcf032"]
+dependencies: ["bcf014", "bcf034"]
 effort: medium
 context: [docs/evidence/core-69055-umount-hang/, docs/notes/upstream-corpus-2026-11-13/, docs/notes/council-dryrun-070-memo-2026-11-14.md, tasks/bcf032-fuser-070-kent-arm.md]
 ---

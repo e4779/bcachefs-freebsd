@@ -1,7 +1,8 @@
 ---
 title: "Kent arm: put the 070 SIGURG reader-kick in front of koverstreet — channel, council-clean branch, logged outcome"
 id: "bcf032"
-status: in-progress
+status: completed
+completed_at: 2026-11-15
 priority: high
 type: chore
 tags: [upstream, fuser, coordination]
@@ -69,8 +70,8 @@ Kent's actual reply is NOT an acceptance criterion — silence is handled by the
 
 - Receipt: https://github.com/koverstreet/bcachefs-tools/issues/1234 —
   канал (a), GitHub Markdown; канонический текст = сама ишуя (draft-файл удалён за неактуальностью, история эволюции — в git-журнале).
-- Loop: OPEN — watching; closure по owner-judgment (ответ Кента или
-  тишина-как-сигнал). Handoff line для bcf033 — после первого исхода:
+- Loop: ПЕРЕДАН в bcf034 (watch-task) — closure по owner-judgment (ответ
+  Кента или тишина-как-сигнал); handoff line для bcf033 живёт там. Handoff line для bcf033 — после первого исхода:
   «coordination attempted via bcachefs-tools issue 1234 on 2026-11-15,
   receipt <link>, <outcome>». Драфт ишуи: docs/notes/draft-bcf032-kent-issue.md (~2.2K).
   Отправка — owner decision.
