@@ -1,7 +1,7 @@
 ---
 id: "bcf014"
 title: "PR: 070 SIGURG reader-kick → koverstreet/fuser (daemon survives umount -f)"
-status: pending
+status: in-progress
 priority: high
 effort: medium
 type: chore
@@ -33,6 +33,31 @@ An upstream PR with a liveness fix: FreeBSD delivers FUSE_DESTROY to exactly ONE
 - PR opened, the link recorded into the task (`--add-pr`), CI/feedback tracked.
 
 Corpus: docs/notes/upstream-corpus-2026-11-13/ + topics (maintainer-tone-fuser-fusefs-2026-11 — the upstream tone, freebsd-contribution-path-2026-11, **fuser-pr-landscape-closed** — cberner PR door CLOSED since 2026-07-17: route = issue-first / Kent coordination; fuser-rust-code-standards — the 12-point checklist for if/when the door reopens).
+
+## Route research (2026-11-15, researcher 032ddd49) — supersedes the PR-first framing
+
+- koverstreet/fuser: issues DISABLED (has_issues=false), 0 PRs, fork created
+  2026-10-02; «идти в ишуи Кента» в форк физически некуда. «Ад ишуев» владельца =
+  koverstreet/bcachefs-tools (226 open/289 closed, живой).
+- cberner/fuser: alive-but-quiet — release 0.18.0 2026-11-14; post-closure merges 49,
+  все от самого cberner (agent-driven, автор коммитов «Claude»); внешних мерджей 0.
+- Door closure reason: AI-slop в PR (cberner #755: «too many AI generated
+  contributions»; README 17.07: «file an issue, or fork instead»). В issues слопа
+  ~0% — стайл #760 (symptom-title, версии, repro) = наш стандарт.
+- Kent отвечает живьём в bcachefs-tools: same-day (#1207, #1173), ≤4d (#1214);
+  в fuser-контексте #757 (наша зона DESTROY) — 0 ответов 5.5 недель.
+
+## Plan (dual-track)
+
+1. PRIMARY: новый issue в cberner/fuser (README-sanctioned door) — symptom-title,
+   body ≤2.5K: окружение, wchan/backtrace из core-69055, минимальный repro, фикс =
+   ВЕТКА В НАШЕМ ФОРКЕ (паттерн #755 «point me to the branch»), без диффа в тексте;
+   cross-ref #757 + #29 (BSD/asomers) + коммиты Кента 8fc86cf6/792855c8/88195892
+   (destroy-before-reply — sibling-фикс той же болезни). Дисклеймер tooling — коротко.
+2. KENT ARM (выбор владельца): (a) короткий heads-up issue в bcachefs-tools (его
+   same-day lane; наш порт = его vendored fuser), (b) почта kent.overstreet@linux.dev,
+   (c) ветка-PR в koverstreet/fuser (форк без трекера, но Кент его оператор).
+3. Полный PR-текст из council dry-run — держать готовым (если дверь приоткроется).
 
 ## Council dry-run findings (2026-11-14) — merge into PR prep
 
