@@ -100,9 +100,9 @@ What we ruled out:
 How-To-Repeat:
 
 1. Deterministic test against a stock kernel. The gtest suite
-   tests/sys/fs/fusefs/fusefs_timeout.cc from
-   https://github.com/e4779/bcachefs-freebsd (patch:
-   overlay/patches/kernel/fusefs-tests-etimedout.patch) mounts a mock
+   tests/sys/fs/fusefs/fusefs_timeout.cc - the full patch is at
+   https://github.com/e4779/bcachefs-freebsd/blob/ab6e591/overlay/patches/kernel/fusefs-tests-etimedout.patch
+   It mounts a mock
    FUSE server that delays FUSE_WRITE replies beyond daemon_timeout;
    a writer then times out. On stock fusefs(4),
    Timeout.append_lane_etimedout fails: the writer observes EINTR and
@@ -135,12 +135,14 @@ In the timeout branch of fuse_io_strategy:
 keep bdirty so data is not lost. Our working patch covers all three
 write lanes (IO_SYNC, discontiguous appends, fsync) and includes the
 test suite above. Attached as a git diff (tests patch attached
-separately); repository:
-https://github.com/e4779/bcachefs-freebsd
-(overlay/patches/kernel/fusefs-151-inverse-fuse_io.patch).
+separately); the same files are also at:
+https://github.com/e4779/bcachefs-freebsd/blob/ab6e591/overlay/patches/kernel/fusefs-151-inverse-fuse_io.patch
 
-Related but distinct: PR 236474 (fsync returns asynchronously -
-completion semantics, not timeout errno handling); PR 293028 (EINTR in
+Related but distinct (bugzilla problem reports, not pull requests):
+bug 236474, https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=236474
+(fsync returns asynchronously - completion semantics, not timeout
+errno handling); bug 293028,
+https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=293028 (EINTR in
 cp(1) and copy_file_range(2) over fuse - userland copy path).
 
 Note on tooling: prepared with LLM-assisted tooling under my
