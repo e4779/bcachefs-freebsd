@@ -1,19 +1,40 @@
 ---
 id: "bcf014"
 title: "PR: 070 SIGURG reader-kick → koverstreet/fuser (daemon survives umount -f)"
-status: in-progress
+status: completed
 priority: high
 effort: medium
 type: chore
 tags: [upstream, fuser]
 dependencies: ["bcf013"]
 created_at: 2026-11-13
+completed_at: 2026-11-15
 context: [overlay/files/, docs/f3-runbook.org, docs/evidence/core-69055-umount-hang/]
 ---
 
 # PR: 070 SIGURG reader-kick → koverstreet/fuser
 
 An upstream PR with a liveness fix: FreeBSD delivers FUSE_DESTROY to exactly ONE reader on the shared fd — the rest sleep in read(2) forever (Linux sends ENODEV to everyone). Our fix: a blocking read + an EINTR check of a flag; the Destroy-arm sets the flag and kicks all registered readers `pthread_kill(SIGURG)` with a no-op handler WITHOUT SA_RESTART — read returns EINTR, the thread sees the flag, exits. Zero per-request cost. Verified live: `umount -f` → the daemon exits on its own within ≤4s.
+
+## Superseded (2026-11-15, owner decision)
+
+Closed completed, not abandoned: the real goal of this card was reached —
+the publication package is council-approved (dry-run 2026-11-14,
+docs/notes/council-dryrun-070-memo-2026-11-14.md: the session_dead
+pre-read amend, SIGURG disposition hygiene, framing kit, mechanical
+gates) and the publication route is researched (see Route research
+above). What changed is the FORM of publication: instead of one PR to
+koverstreet/fuser, the owner split the track into two children —
+«014 закрыть с комментарием (переосмыслили задачу), из неё вывести
+две новых задачи» (decision 2026-11-15):
+
+- bcf032 — Kent arm: contact koverstreet (channel choice at start),
+  council-clean branch, logged outcome;
+- bcf033 — cberner issue: the README-sanctioned issue-first door,
+  filed after the Kent arm.
+
+No open work remains here; the PR-text kit and framing rules live on
+in the memo and the two children.
 
 ## Material
 
