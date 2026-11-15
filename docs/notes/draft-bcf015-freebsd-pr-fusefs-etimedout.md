@@ -19,110 +19,131 @@
 - Вложения >20 строк — файлами: `procstat`-выдержки, полный вывод теста.
 - Двойная проверка перед отправкой: все file:line по свежему main; номера
   приложений (236474, 293028) актуальны.
+- Стратегия (по прецеденту 300130): ОДИН bug-report с аттачментами —
+  (1) git diff фикса fuse_io, (2) git diff тестов. НЕ два отдельных
+  сабмита — двойная очередь. PR на GitHub — только если триаж попросит.
+- Формат: секции Environment/Description/How-To-Repeat/Fix (канон
+  гайда problem-reports), plain text без разметки (без бэктиков/**),
+  ASCII, строки <=76, патчи только аттачментами (guide: quoted-printable
+  убивает inline-диффы).
 
 ---
 
-## Текст отчёта (EN, paste-ready)
+## Текст отчёта (EN, paste-ready, PLAIN TEXT — канон
+## docs.freebsd.org/articles/problem-reports: секции Environment /
+## Description / How-To-Repeat / Fix; патчи аттачментами; ASCII; строки
+## <=76; никакой разметки)
 
-**Title:** `[fusefs]: timed-out writes return bogus EINTR and the buffer is re-dirtied without recording the error`
+BUGZILLA SUMMARY FIELD:
 
-**Environment:**
-FreeBSD 15.1-RELEASE-p6 amd64; the cited code is identical in
+[fusefs]: timed-out writes return bogus EINTR and the buffer is
+re-dirtied without recording the error
+
+
+Environment:
+
+FreeBSD 15.1-RELEASE-p6 amd64. The cited code is identical in
 stable/15 (release/15.1.0) and current main. FUSE server: bcachefs
 over FUSE (https://github.com/e4779/bcachefs-freebsd), default
 daemon_timeout (60 s). Observed live in production, then confirmed
 by code reading and a deterministic test.
 
-**Reproduction:**
 
-1. Deterministic test (repro against a stock kernel): the gtest suite
-   `tests/sys/fs/fusefs/fusefs_timeout.cc` from
-   https://github.com/e4779/bcachefs-freebsd (patch in
-   `overlay/patches/kernel/fusefs-tests-etimedout.patch`). A mock FUSE
-   server delays FUSE_WRITE replies beyond `daemon_timeout`, then a
-   writer times out. Against stock fusefs(4), `Timeout.append_lane_etimedout`
-   fails: the writer observes EINTR instead of ETIMEDOUT and the buffer
-   stays dirty. Against the patched module the test passes (ETIMEDOUT in
-   one window, 3.0 s wall-clock assert). Neighbouring suites (Fsync,
-   Interrupt) pass unchanged on both.
+Description:
 
-2. Live observation (production wedge, 2026-11-06): a qbittorrent
-   thread parked in `fdisp_wait_answ` inside
-   `fuse_write_directbackend -> fuse_io_strategy -> fuse_vnop_write`
-   while all daemon threads were idle (FUSE reader in poll, control
-   socket in accept, workers sleeping); the daemon's web UI answered
-   200 during the same wedge and the daemon processed ~65k ops/s
-   (dtrace). The daemon served; the wedge lived in the kernel's
-   timeout handling.
+fuse_ipc.c waits daemon_timeout seconds for a reply and then returns
+ETIMEDOUT (sys/fs/fuse/fuse_ipc.c:436-444, main; stable/15
+identical). The write path discards that knowledge.
 
-**Observed:**
-
-The errno chain, with file:line (main; stable/15 identical):
-
-1. `sys/fs/fuse/fuse_ipc.c:436-444` — `fdisp_wait_answ` sleeps
-   `daemon_timeout` seconds and converts `EWOULDBLOCK` into
-   `ETIMEDOUT`. The kernel now knows the op timed out.
-2. `sys/fs/fuse/fuse_io.c:896-904` — `fuse_io_strategy` receives
-   `ETIMEDOUT`, re-dirties the buffer (`bdirty`, clears `B_DONE`) and
-   records **nothing**: no `BIO_ERROR`, no `b_error`. For synchronous
-   callers (`!B_ASYNC`) it sets `B_EINTR` — for both `EINTR` and
-   `ETIMEDOUT`.
-3. `sys/kern/vfs_bio.c:4574-4577` — `bwait` converts `B_EINTR` into a
-   bare `EINTR` return.
+fuse_io_strategy (sys/fs/fuse/fuse_io.c:896-904) receives ETIMEDOUT,
+re-dirties the buffer (bdirty, clears B_DONE) and records nothing: no
+BIO_ERROR, no b_error. For synchronous callers (!B_ASYNC) it sets the
+B_EINTR flag - for both EINTR and ETIMEDOUT. bwait
+(sys/kern/vfs_bio.c:4574-4577) then converts B_EINTR into a bare EINTR
+return.
 
 Consequences:
 
-- A synchronous writer gets `EINTR` for a syscall that was never
-  signalled. POSIX-wise EINTR means "retry me": applications retry —
-  each retry burns another full `daemon_timeout` window in
-  `fdisp_wait_answ`. In our production this surfaced as an
-  infinite EINTR-retry churn (libtorrent retrying a write against a
-  healthy daemon forever).
-- An asynchronous writeback buffer is re-dirtied with no error marker
-  and no retry scheduling; the failure is invisible to every consumer
-  that reads `b_error`/`BIO_ERROR`.
-- `fsync(2)`: `vn_fsync_buf` (`sys/kern/vfs_vnops.c:3245`, `maxretry =
-  10000` at `:3253`) reads `b_error == 0` on the re-dirtied buffer and
-  keeps flushing; each pass costs one `daemon_timeout` window; after
-  maxretry passes it returns `EAGAIN` instead of the real error.
+1. A synchronous writer gets EINTR for a syscall that was never
+   signalled. EINTR reads as "retry me": applications retry, and each
+   retry burns another full daemon_timeout window inside
+   fdisp_wait_answ. In our production this surfaced as an endless
+   EINTR-retry loop (qbittorrent/libtorrent retrying a write against a
+   healthy daemon).
 
-**Expected:**
+2. An asynchronous writeback buffer is re-dirtied with no error marker
+   and no retry scheduling; the failure is invisible to every consumer
+   reading b_error or BIO_ERROR.
 
-The timeout error should reach the writer as `ETIMEDOUT`, and the
-buffer should carry the error (`BIO_ERROR` + `b_error`) so that flush
-and fsync loops terminate after one window instead of churning.
+3. fsync(2): vn_fsync_buf (sys/kern/vfs_vnops.c:3245; maxretry = 10000
+   at :3253) reads b_error == 0 on the re-dirtied buffer and keeps
+   flushing; each pass costs one daemon_timeout window; after maxretry
+   passes it returns EAGAIN instead of the real error.
 
-**Analysis (what we ruled out):**
+What we ruled out:
 
-- The FUSE server: at every observed wedge the daemon was alive and
-  serving (idle-in-poll thread stacks on both sides, web UI 200
-  mid-wedge, ~65k ops/s dtrace throughput). Stacks captured at two
-  independent wedges show the client parked in `fdisp_wait_answ`
-  inside `fuse_vnop_write` / `fuse_vnop_read` while the daemon slept
-  in poll/accept.
+- The FUSE server. At every observed wedge the daemon was alive and
+  serving: thread stacks on both sides show the client parked in
+  fdisp_wait_answ inside fuse_vnop_write / fuse_vnop_read while the
+  daemon slept in poll/accept; the daemon web UI answered 200 during
+  the same wedge, and dtrace measured ~65k ops/s throughput.
+
 - Server-side reply-path bugs (lost writev, MT lockups) existed and
-  were fixed in our server earlier; this wedge class persisted after
-  those fixes, until we fixed the errno path in the kernel (below).
+  were fixed in our server earlier; this wedge class survived those
+  fixes.
+
 - A non-serving daemon is detectable and distinct: with the daemon
   SIGSTOPped, ops time out with ETIMEDOUT after one window (verified
   on a test mount).
 
-**Suggested direction:**
 
-In the timeout branch of `fuse_io_strategy`, record the error on the
-buffer — `bp->b_ioflags |= BIO_ERROR; bp->b_error = ETIMEDOUT;` — keep
-`bdirty` so data is not lost, and reserve `B_EINTR` for genuine
-`EINTR`. Our working patch does exactly this (three write lanes
-covered: IO_SYNC, discontiguous appends, fsync), with tests:
+How-To-Repeat:
+
+1. Deterministic test against a stock kernel. The gtest suite
+   tests/sys/fs/fusefs/fusefs_timeout.cc from
+   https://github.com/e4779/bcachefs-freebsd (patch:
+   overlay/patches/kernel/fusefs-tests-etimedout.patch) mounts a mock
+   FUSE server that delays FUSE_WRITE replies beyond daemon_timeout;
+   a writer then times out. On stock fusefs(4),
+   Timeout.append_lane_etimedout fails: the writer observes EINTR and
+   the buffer stays dirty. With the attached fix the test passes
+   (ETIMEDOUT in one window, 3.0 s wall-clock assert); the
+   neighbouring Fsync and Interrupt suites pass unchanged on both
+   kernels.
+
+2. Live stacks from a production wedge (2026-11-06, qbittorrent
+   writing):
+
+       client: fdisp_wait_answ+0x150
+           <- fuse_write_directbackend <- fuse_io_strategy
+           <- bufwrite <- fuse_write_biobackend <- fuse_vnop_write
+           <- sys_write
+       daemon: FUSE reader in poll, control socket in accept, workers
+           asleep
+
+   Full procstat -k excerpts of both sides attached.
+
+
+Fix:
+
+Record the error on the buffer and reserve B_EINTR for genuine EINTR.
+In the timeout branch of fuse_io_strategy:
+
+    bp->b_ioflags |= BIO_ERROR;
+    bp->b_error = ETIMEDOUT;
+
+keep bdirty so data is not lost. Our working patch covers all three
+write lanes (IO_SYNC, discontiguous appends, fsync) and includes the
+test suite above. Attached as a git diff (tests patch attached
+separately); repository:
 https://github.com/e4779/bcachefs-freebsd
-(`overlay/patches/kernel/fusefs-151-inverse-fuse_io.patch`). Happy to
-submit it as a git-diff attachment here.
+(overlay/patches/kernel/fusefs-151-inverse-fuse_io.patch).
 
-**Related but distinct:** PR 236474 (fsync returns asynchronously —
+Related but distinct: PR 236474 (fsync returns asynchronously -
 completion semantics, not timeout errno handling); PR 293028 (EINTR in
-cp(1)/copy_file_range(2) over fuse — userland copy path).
+cp(1) and copy_file_range(2) over fuse - userland copy path).
 
-**Note on tooling:** prepared with LLM-assisted tooling under my
+Note on tooling: prepared with LLM-assisted tooling under my
 supervision.
 
 ---
