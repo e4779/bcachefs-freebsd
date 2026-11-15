@@ -1,7 +1,7 @@
 ---
 title: "Kent arm: put the 070 SIGURG reader-kick in front of koverstreet — channel, council-clean branch, logged outcome"
 id: "bcf032"
-status: pending
+status: in-progress
 priority: high
 type: chore
 tags: [upstream, fuser, coordination]
@@ -38,6 +38,23 @@ Channel (FIXED by owner 2026-11-15): (a) heads-up issue in koverstreet/bcachefs-
 - [ ] The loop is closed in the card: a substantive outcome logged, OR an explicit owner-judgment of sufficient-silence logged with the receipt; the handoff line states exactly what bcf033 inherits.
 
 Kent's actual reply is NOT an acceptance criterion — silence is handled by the owner-judgment closure, not by failure.
+
+## Receipts (2026-11-15, worker 988f0fa4)
+
+- Base: c0420fc (koverstreet/fuser master HEAD 2026-08-07). Нюанс: наш vendored — на
+  линии Кента (destroy-before-reply 8819589, окт), а публикуем 070 поверх cberner
+  master — правильно для апстрим-видимости; на линию Кента переносится отдельно
+  (там destroy-before-reply — сиблинг, не конфликт 070).
+- Fix rev: f5d1e5e (e4779/fuser, ветка 070-reader-kick, 1 коммит, tree clean).
+- Compare: https://github.com/koverstreet/fuser/compare/master...e4779:070-reader-kick
+  gh-api verify: files=2 (channel.rs +35/−0, session.rs +78/−1), commits=1, сумма +113/−1.
+- fmt: cargo fmt --check CLEAN (toolchain 1.85, style_edition 2024).
+- Портировано: receive_session_aware + pre-read session_dead (Acquire); Destroy-arm
+  Release-store + SIGURG кик (cfg(freebsd)); P2 hygiene (oldact save/verify + warn,
+  идемпотентно); реестр читателей (pthread_self) + поля SessionEventLoop.
+- Стрипнуто: writev-retry, n_threads-lift, SessionACL::to_mount_option (уже идентичен
+  на master), destroy-before-reply arm + RwLock-FilesystemHolder (линия 8819589).
+- Pending: cargo clippy (слот оркестратора, запущен) → work-verifier против AC → ишуя.
 
 ## Source
 
