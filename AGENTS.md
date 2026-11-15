@@ -163,7 +163,7 @@ flowchart LR
 Project-local (`.pi/agents/`, in git): `task-writer`,
 `work-verifier`. Universal by doctrine — domain expertise enters
 through task context, not through narrow personas. User-level
-(~/.pi/agent/agents/): researcher / skeptic / script-kiddie etc.
+(~/.pi/agent/agents/): researcher / skeptic / shell-expert etc. (ex-script-kiddie; rust-coder pruned 2026-11-15 — Rust work goes to the BASE agent on glm-5.3 :max with a line-level spec + work-verifier)
 are generic; the owner is pruning narrow ones.
 
 ## Structured-text convention (AGENTS.md, persona prompts, SKILL.md)
