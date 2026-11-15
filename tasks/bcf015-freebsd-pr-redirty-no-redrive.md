@@ -1,7 +1,7 @@
 ---
 id: "bcf015"
 title: "FreeBSD PR (bug report): redirty-no-redrive — the kernel retries an ETIMEDOUT write forever"
-status: in-progress
+status: completed
 priority: medium
 effort: medium
 type: bug
@@ -9,6 +9,7 @@ tags: [upstream, kernel]
 dependencies: ["bcf023", "bcf013"]
 created_at: 2026-11-13
 context: [docs/f3-runbook.org, overlay/patches/kernel/, tasks/bcf001-p1a-mt-fix.md]
+completed_at: 2026-11-15
 ---
 
 # FreeBSD PR (bug report): kernel redirty-no-redrive
@@ -29,6 +30,11 @@ We are waiting on the daemon-alive discriminator (bcf023): at the next wedge, pr
 ## Definition of done
 
 - The report sent, the number/link recorded into the task; the link-up with the bcf005 PR stated.
+- DONE 2026-11-15: filed as bug 300785 (https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=300785)
+  by the owner; Base System/kern, severity "Affects Some People"; attachments 277313
+  (fix, git diff) + 277314 (tests, git diff), both flagged patch. Text: the paste-ready
+  plain-text block from docs/notes/draft-bcf015-freebsd-pr-fusefs-etimedout.md. The bcf005
+  link-up: the fix itself travels inside this bug as attachment 277313.
 
 ## Source
 
