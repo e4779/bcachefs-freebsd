@@ -26,11 +26,13 @@
   гайда problem-reports), plain text без разметки (без бэктиков/**),
   ASCII, строки <=76, патчи только аттачментами (guide: quoted-printable
   убивает inline-диффы).
+- Ссылки в тексте: репо один раз в Environment (источник FUSE-сервера =
+  часть окружения); патчи — только аттачменты, в тексте по именам;
+  глубокие GitHub-ссылки из текста убраны (дубли аттачментов).
 - Синтаксис кросс-ссылок bugzilla (автолинки) — НЕ из памяти, а из живого
   шаблона: gh api repos/freebsd/bugzilla/contents/template/en/custom/global/textarea.html.tmpl
   --jq '.content' | base64 -d | grep -B1 -A2 'To link'  (пример: bug #N,
-  comment #N, bug #N, comment #N, base rN, review DN). Ссылки на внешние
-  файлы — pin-SHA blob URL целиком (URL не ломать).
+  comment #N, bug #N, comment #N, base rN, review DN).
 
 ---
 
@@ -105,9 +107,8 @@ What we ruled out:
 How-To-Repeat:
 
 1. Deterministic test against a stock kernel. The gtest suite
-   tests/sys/fs/fusefs/fusefs_timeout.cc - the full patch is at
-   https://github.com/e4779/bcachefs-freebsd/blob/ab6e591/overlay/patches/kernel/fusefs-tests-etimedout.patch
-   It mounts a mock
+   tests/sys/fs/fusefs/fusefs_timeout.cc (full patch attached:
+   fusefs-tests-etimedout.patch) mounts a mock
    FUSE server that delays FUSE_WRITE replies beyond daemon_timeout;
    a writer then times out. On stock fusefs(4),
    Timeout.append_lane_etimedout fails: the writer observes EINTR and
@@ -139,9 +140,8 @@ In the timeout branch of fuse_io_strategy:
 
 keep bdirty so data is not lost. Our working patch covers all three
 write lanes (IO_SYNC, discontiguous appends, fsync) and includes the
-test suite above. Attached as a git diff (tests patch attached
-separately); the same files are also at:
-https://github.com/e4779/bcachefs-freebsd/blob/ab6e591/overlay/patches/kernel/fusefs-151-inverse-fuse_io.patch
+test suite above. Attached as a git diff
+(fusefs-151-inverse-fuse_io.patch; tests patch attached separately).
 
 Related but distinct (bugzilla problem reports, not pull requests):
 bug #236474 (fsync returns asynchronously - completion semantics, not
