@@ -68,7 +68,7 @@ Kent's actual reply is NOT an acceptance criterion — silence is handled by the
 ## SENT (2026-11-15, owner-approved)
 
 - Receipt: https://github.com/koverstreet/bcachefs-tools/issues/1234 —
-  канал (a), markdown-боди v3 (draft-bcf032-kent-issue.md).
+  канал (a), GitHub Markdown; канонический текст = сама ишуя (draft-файл удалён за неактуальностью, история эволюции — в git-журнале).
 - Loop: OPEN — watching; closure по owner-judgment (ответ Кента или
   тишина-как-сигнал). Handoff line для bcf033 — после первого исхода:
   «coordination attempted via bcachefs-tools issue 1234 on 2026-11-15,
