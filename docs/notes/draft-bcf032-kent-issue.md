@@ -30,12 +30,11 @@ Evidence from one incident (2026-11-07): 7 readers parked in read(2); the
 FUSE_DESTROY recipient ran destroy + reply and exited; lldb on the captured
 core then showed the remaining 6 still in __sys_read, with main in join.
 
-Our fix - branch 070-reader-kick @ 9475151, would-be-PR diff:
+Our fix - branch 070-reader-kick, would-be-PR diff:
 
     https://github.com/koverstreet/fuser/compare/master...e4779:070-reader-kick
 
-A single commit (+113/-1, channel.rs/session.rs) on master (c0420fc), all
-FreeBSD-gated. The destroy arm stores a session_dead flag (Release) and kicks
+A single commit on master, all FreeBSD-gated. The destroy arm stores a session_dead flag (Release) and kicks
 every registered reader with pthread_kill(SIGURG) under a no-op handler
 installed WITHOUT SA_RESTART - the interrupted read returns EINTR and the
 thread exits. receive_session_aware checks the flag (Acquire)
@@ -78,6 +77,9 @@ Note on tooling: prepared with LLM-assisted tooling under my supervision.
   tools/fuser-vendored/ в Environment; (10) TITLE/`/BODY` маркеры не-сендабельности.
 - Если body >2.5K при вставке — резать path anchor (решение maintainer), не
   base-clarification.
+- Owner override (2026-11-15): пины цифр убраны (+117/−1, c0420fc, @ 9475151 —
+  «цифры протухнут»); base-clarification «on master» сохранён (блокер
+  maintainer), единственный стабильный указатель = compare-URL (always head).
 - Порядок: owner «го» → файлит владелец → квитанция в карточку → bcf032 loop
   closed по owner-judgment (тишина = сигнал).
 - Скептик change-my-mind: не сработал (мы правим, а не спорим).
