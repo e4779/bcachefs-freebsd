@@ -45,7 +45,9 @@ Kent's actual reply is NOT an acceptance criterion — silence is handled by the
   линии Кента (destroy-before-reply 8819589, окт), а публикуем 070 поверх cberner
   master — правильно для апстрим-видимости; на линию Кента переносится отдельно
   (там destroy-before-reply — сиблинг, не конфликт 070).
-- Fix rev: f5d1e5e (e4779/fuser, ветка 070-reader-kick, 1 коммит, tree clean).
+- Fix rev: 9475151 (e4779/fuser, ветка 070-reader-kick, 1 коммит, tree clean;
+  f5d1e5e перезаписан amend'ом — верификатор поймал «FreeBSD 14» в сообщении,
+  прод 15.1-RELEASE-p6; force-push до отправки Кенту, никто не видел).
 - Compare: https://github.com/koverstreet/fuser/compare/master...e4779:070-reader-kick
   gh-api verify: files=2 (channel.rs +35/−0, session.rs +78/−1), commits=1, сумма +113/−1.
 - fmt: cargo fmt --check CLEAN (toolchain 1.85, style_edition 2024).
@@ -54,7 +56,11 @@ Kent's actual reply is NOT an acceptance criterion — silence is handled by the
   идемпотентно); реестр читателей (pthread_self) + поля SessionEventLoop.
 - Стрипнуто: writev-retry, n_threads-lift, SessionACL::to_mount_option (уже идентичен
   на master), destroy-before-reply arm + RwLock-FilesystemHolder (линия 8819589).
-- Pending: cargo clippy (слот оркестратора, запущен) → work-verifier против AC → ишуя.
+- Pending: work-verifier — VERIFIED 5/5 (branch/compare, strip-лист, framing kit
+  в commit message + лексикон-скан 0 grievance-слов, fmt/clippy, lane-факты
+  свежи с точностью до часов; один failed пойман и исправлен — версия FreeBSD
+  в commit message). Драфт ишуи: docs/notes/draft-bcf032-kent-issue.md (~2.2K).
+  Отправка — owner decision.
 
 ## Source
 
