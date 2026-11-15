@@ -26,6 +26,11 @@
   гайда problem-reports), plain text без разметки (без бэктиков/**),
   ASCII, строки <=76, патчи только аттачментами (guide: quoted-printable
   убивает inline-диффы).
+- Синтаксис кросс-ссылок bugzilla (автолинки в интерфейсе): `bug #N`
+  (другой баг), `comment #N` (комментарий этого бага),
+  `bug #N, comment #N` (чужой комментарий), `base rN` / `ports rN` /
+  `doc rN` (SVN-коммиты), `review DN` (Phabricator). Ссылки на внешние
+  файлы — pin-SHA blob URL целиком (URL не ломать).
 
 ---
 
@@ -139,11 +144,9 @@ separately); the same files are also at:
 https://github.com/e4779/bcachefs-freebsd/blob/ab6e591/overlay/patches/kernel/fusefs-151-inverse-fuse_io.patch
 
 Related but distinct (bugzilla problem reports, not pull requests):
-bug 236474, https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=236474
-(fsync returns asynchronously - completion semantics, not timeout
-errno handling); bug 293028,
-https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=293028 (EINTR in
-cp(1) and copy_file_range(2) over fuse - userland copy path).
+bug #236474 (fsync returns asynchronously - completion semantics, not
+timeout errno handling); bug #293028 (EINTR in cp(1) and
+copy_file_range(2) over fuse - userland copy path).
 
 Note on tooling: prepared with LLM-assisted tooling under my
 supervision.
