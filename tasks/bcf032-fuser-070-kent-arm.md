@@ -59,7 +59,20 @@ Kent's actual reply is NOT an acceptance criterion — silence is handled by the
 - Pending: work-verifier — VERIFIED 5/5 (branch/compare, strip-лист, framing kit
   в commit message + лексикон-скан 0 grievance-слов, fmt/clippy, lane-факты
   свежи с точностью до часов; один failed пойман и исправлен — версия FreeBSD
-  в commit message). Драфт ишуи: docs/notes/draft-bcf032-kent-issue.md (~2.2K).
+  в commit message).
+- Council #3 (style/skeptic/maintainer): все FIX→SEND, ноль hold; blocker'ы
+  сняты (evidence двух-моментно по lldb-инвентарю; base-неоднозначность явной
+  фразой). Owner правки: пины цифр сняты (протухнут), Environment → «I ported
+  bcachefs… the bcachefs pool lives in my homelab», body → GitHub Markdown.
+
+## SENT (2026-11-15, owner-approved)
+
+- Receipt: https://github.com/koverstreet/bcachefs-tools/issues/1234 —
+  канал (a), markdown-боди v3 (draft-bcf032-kent-issue.md).
+- Loop: OPEN — watching; closure по owner-judgment (ответ Кента или
+  тишина-как-сигнал). Handoff line для bcf033 — после первого исхода:
+  «coordination attempted via bcachefs-tools issue 1234 on 2026-11-15,
+  receipt <link>, <outcome>». Драфт ишуи: docs/notes/draft-bcf032-kent-issue.md (~2.2K).
   Отправка — owner decision.
 
 ## Source
