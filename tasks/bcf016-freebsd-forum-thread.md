@@ -1,7 +1,7 @@
 ---
 id: "bcf016"
 title: "Thread on the FreeBSD forums: bcachefs-vm bridge + native FUSE port (project announcement)"
-status: pending
+status: in-progress
 priority: medium
 effort: medium
 type: docs
@@ -30,6 +30,16 @@ Corpus: docs/notes/upstream-corpus-2026-11-13/ + topic freebsd-ai-policy-status-
 1. The text per the opensource-contribution skill (the tone of a forum post, not a press release; no AI-slop).
 2. The choice of a forum section ( ports? / storage? ), a draft in docs/ for owner review BEFORE publication.
 3. Publication by the owner; the thread link — into the repo README.
+
+## POSTED (2026-11-15, pending moderation)
+
+- Куда: forums.freebsd.org, секция **Porting New Software (22)**. Аккаунт свежий →
+  пост ждёт премодерации. Текст: docs/notes/draft-bcf016-forum-post.md (v4 + правки
+  владельца при постинге: короткие линк-лейблы, «Real performance feels not
+  native, but enough.», closer «Open for discussion.»).
+- После апрува: записать URL нити сюда + в README → completed.
+- Fallback при отказе (свежий аккаунт): секция General (3).
+- Etiquette: не пинговать; после апрува — отвечать только по существу.
 
 ## Definition of done
 
