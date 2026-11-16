@@ -25,7 +25,7 @@ Pool: `0ec475a1-a0c1-4877-9f6d-ae54986f43f8`, /mnt/pool, `/dev/nda0p3`
   improves_placement=false / improves_durability=false (2=2) → `parks_on` →
   pending, zero movement (§2, row P-A).
 - **Nothing retries the pending list — upstream invariant.** Kent's own
-  comment (`plan.rs:313-315`); the C kernel has no freed-space event either.
+  comment (`plan.rs:310-315`); the C kernel has no freed-space event either.
   Upstream moved 1437 commits past our base without touching this mechanics.
 - **The "regrow 0 → 12.2M" scare was a measurement artifact** (§3): foreign
   test-uuid daemons + a used/total siginfo pair. Pool truth: sticky floor
@@ -49,8 +49,8 @@ drain timing, creates no backlog.
 |---|---|---|---|
 | P-A. Target-class park (btree placement invariant). `metadata_target=none` → btree `background_target` = `foreground_target` = nvme (single-device) → hdd replica of every 2-replica node off-target → need target (`needs_reconcile.rs:110-116`) → Move planned → `write_btree_feasible`: improves_placement (avail 1 > on-target 1)=false, improves_durability (2<2)=false (`update_feasible.rs:152-161`) → `data_update_fail_no_rw_devs` **by design** → `parks_on` (`plan.rs:316-337`) → `park()`. Code comment: a rewrite that can't improve placement "succeeds" off target and **requeues forever**. With metadata_replicas=2 on 2 devices *no target saturates* — invariant of the config, not of space. | `tools/fs/fs/inode_opts.rs:214`, `tools/fs/data/update_feasible.rs:128-161`, `tools/fs/data/reconcile/plan.rs:316-337` | **invariant** (fix = §5) | show-super: metadata_replicas=2, metadata_target=none, fg=nvme, bg=hdd, Durability 1+1 (§3, 11-16/17); USR1 probe repark 1:1; pend == btree total exactly |
 | P-B. Replicas-class park (`Plan::Park(Replicas)`): need data_replicas + hipri (`needs_reconcile.rs:158-164`), kills empty (devices healthy) → `only(data_replicas)` → `Park(Replicas)` ("can't match data_replicas=N") | `tools/fs/data/reconcile/plan.rs:186-189`, `plan.rs:296-306` | dormant branch — does NOT fire here (all nodes 2-replica, durability 2=2; fires only for a 1-replica btree node) | show-super Durability=1 on both devices kills the earlier "nvme dur=0 under-replication" theory; class retained for map completeness |
-| P-C. Sticky pending / no retry: pending phases run only with a pending-scan cookie (`work.rs:871-874`); cookie requested only by topology/config/opt events, recovery boundaries, sysfs, SIGUSR1 (`scan.rs`, `opts/change.rs:59,76`, `dev.c` leftovers, `telemetry.rs:356`). No freed-space event exists **in C either** — "nothing retries the pending list… the configuration has to change first" (Kent, `plan.rs:313-315`; `check_reconcile_pending_err()` referenced there does not exist). | `tools/fs/data/reconcile/work.rs:871-874`, `plan.rs:313-315`, C: `fs/bcachefs/data/reconcile/work.c:132-166` | **upstream invariant** (automation beyond upstream = bcf025 territory) | upstream-gap research: full C↔Rust event-matrix table, no material gap; upstream 1437 commits changed none of it |
-| P-D. io-clock gate: thread sleeps in `Copygc::sleep` → `io_clock::wait_until`; deadline = `capacity >> 6` WRITE sectors of the smaller RW disk (`work.rs:914`) ≈ 128 GiB for 4 TB; reads don't tick the clock, so read-only stretches sleep unboundedly. Gate *between* kick windows — the enabler of zero drain, not the backlog creator. | `tools/fs/data/reconcile/work.rs:905-923` | **gate** | live ring `reconcile_status`: "17.2G WRITE wait / 10.8G remaining, duration waited 8-9h", backtrace `Copygc::sleep → io_clock::wait_until`; thread worked only ~20 min after the 11-16 00:07 scan event |
+| P-C. Sticky pending / no retry: pending phases run only with a pending-scan cookie (`work.rs:871-874`); cookie requested only by topology/config/opt events, recovery boundaries, sysfs, SIGUSR1 (`scan.rs`, `opts/change.rs:59,76`, `dev.c` leftovers, `telemetry.rs:356`). No freed-space event exists **in C either** — "nothing retries the pending list… the configuration has to change first" (Kent, `plan.rs:310-315`; `check_reconcile_pending_err()` referenced there does not exist). | `tools/fs/data/reconcile/work.rs:871-874`, `plan.rs:310-315`, C: `fs/bcachefs/data/reconcile/work.c:132-166` | **upstream invariant** (automation beyond upstream = bcf025 territory) | upstream-gap research: full C↔Rust event-matrix table, no material gap; upstream 1437 commits changed none of it |
+| P-D. io-clock gate: thread sleeps in `Copygc::sleep` → `io_clock::wait_until`; deadline = `capacity >> 6` WRITE sectors of the smaller RW disk (`work.rs:914`) ≈ 17 GB for the 1.1T nvme (4 TB would be ≈ 60 GB); reads don't tick the clock, so read-only stretches sleep unboundedly. Gate *between* kick windows — the enabler of zero drain, not the backlog creator. | `tools/fs/data/reconcile/work.rs:905-923` | **gate** | live ring `reconcile_status`: "17.2G WRITE wait / 10.8G remaining, duration waited 8-9h", backtrace `Copygc::sleep → io_clock::wait_until`; thread worked only ~20 min after the 11-16 00:07 scan event |
 | P-E. dev1 leaving-limbo drip (growth engine): dev1 in leaving limbo → parked keys oscillate pend ↔ tgt(=dev_leaving) — 512-sector drips (~47 s) and bulk reparks every 4-9 h; excess ≈ +1.4M sectors / 9 d. The only load-dependent term (+3% of a write burst). All of it swept 1:1 into pend by the USR1 probe — the floor absorbed the limbo. | trigger-path re-eval: `needs_reconcile.rs:180-188`, `trigger.rs:217-228`; repark: `plan.rs:316-337` | explained residual churn (swept; re-accumulates only via new burst-created tgt accounting) | ring quasi-conservation over 9,673 samples; probe: tgt 206,848 → pend +206,848 exactly, tgt→0 |
 | P-F. ENOSPC-class parks (user data): `parks_on` on no_rw_devs / insufficient_devices / ENOSPC | `plan.rs:316-337`, commit path `plan.rs:368` | **zero in this tail** — the 144M ENOSPC-era tail (full HDD target, 11-06/07) drained at ~240 MB/s; what remained is not space-dependent | accounting: cmp=ec=rep=chk=hipri=str=0 all window; verdict ENOSPC=0 |
 | P-G. EC/NoStripe parks | `plan.rs:160-162`, `plan.rs:296-306` | not applicable — EC off (data_replicas=1 ⇒ erasure_code=0), rw_ec=0 all window | accounting zeros |
@@ -134,7 +134,7 @@ identity `pend == dd_dev0_btree` across independent ring counters is.
 | (b) `metadata_target=disk-group(nvme+hdd)` | both replicas on-target → improves_placement becomes true → moves proceed; redundancy preserved | no redundancy reduction | needs a disk group + opt change; practical at the next planned bounce (remount); per-node moves then actually rewrite the btree (io cost spread over io-clock windows) |
 | (c) upstream discussion: `metadata_target=none` → `foreground` fallback semantics | a 2-replica metadata setting silently resolving to a 1-device target parks every btree node on any 2-device pool with default opts — worth an upstream issue/discussion (material for the bcf014 pipeline) | none here; may fix the class at the root for everyone | upstream bandwidth; Kent's queue is a solo sprint (1437 commits, zero issue refs in window) |
 
-Interim posture while undecided: document the floor as an invariant (this
+Interim posture (fix B approved by the owner 2026-11-16; application at the next planned bounce): the floor stays documented as an invariant (this
 note); keep bcf030 alert signature on `reconcile_work.pend[1]` from
 accounting.json (never the siginfo used-field); bcf025 cron-USR1 is
 NO-GO as drainage (reparks 1:1 — measured), at most a liveness probe.
@@ -143,15 +143,15 @@ NO-GO as drainage (reparks 1:1 — measured), at most a liveness probe.
 
 Research drafts (raw, pre-correction — superseded where this note conflicts):
 
-- `tmp/research/bcf012-park-map-draft.md` — pending-drainage mechanics,
+- `docs/notes/research/bcf012/bcf012-park-map-draft.md` — pending-drainage mechanics,
   cookie-callback census (work.rs/scan.rs/dev.c/change.rs/telemetry.rs)
-- `tmp/research/bcf012-upstream-gap.md` — full C↔Rust wakeup event matrix,
+- `docs/notes/research/bcf012/bcf012-upstream-gap.md` — full C↔Rust wakeup event matrix,
   drifts D1–D3, no-material-gap verdict
-- `tmp/research/bcf012-hypotheses.md` — measurement-artifact audit, H1–H5
+- `docs/notes/research/bcf012/bcf012-hypotheses.md` — measurement-artifact audit, H1–H5
   with passive falsifiers, drip arithmetic
-- `tmp/research/bcf012-park-condition-rederive.md` — skeptic #2: P-matrix
+- `docs/notes/research/bcf012/bcf012-park-condition-rederive.md` — skeptic #2: P-matrix
   (P1/P2a/P2b…), the none→foreground fallback derivation, USR1 re-read
-- `tmp/research/bcf012-upstream-staleness.md` — 1437-commit window scan,
+- `docs/notes/research/bcf012/bcf012-upstream-staleness.md` — 1437-commit window scan,
   per-commit table, issue/PR landscape
 
 Ops/evidence:
