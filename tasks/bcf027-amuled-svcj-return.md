@@ -27,9 +27,12 @@ bcf001 gate, own gate = clean state + manual verification.
   `amuled_svcj=YES` + `net_basic`; cell live, daemon pid 30095 under `_p2p`
   inside, listeners EC 4712 + 4662/4665/4672 from the cell, EC client connect
   OK (127.0.0.1:4712 <- node).
-- [ ] Survive a reboot.
-  DEFERRED by owner's no-reboots rule (2026-11-16): test at the next planned
-  reboot window — bundle with bcf005's pending kyua-after-reboot step.
+- [x] Survive a reboot.
+  DONE 2026-11-16 13:41 boot (owner's rehearsal reboot before the RAM
+  upgrade; earlier boot 13:37 aborted by owner): svcj-amuled cell came up
+  from the boot chain (jls name=svcj-amuled), daemon pid 3428 under `_p2p`,
+  EC client connected (127.0.0.1:4712). Full post-boot stack verified:
+  7/7 svcj cells up, poolfuse auto-mounted, canary sha 599b9472 MATCH.
 - [x] onestop → onestart cycle leaves no stale jail (known svcj
       jail-leak on out-of-band kill — f3-heal v2.0 hit "jail N
       already exists"; runbook).
@@ -41,9 +44,8 @@ bcf001 gate, own gate = clean state + manual verification.
 ## Acceptance Criteria
 
 - [x] amuled runs jailed (svcj) and survives a reboot.
-  VERIFIED jailed 2026-11-16 (live receipts above); the reboot half is
-  DEFERRED to the next planned reboot window (see Tasks) — closure does not
-  wait for it.
+  VERIFIED both halves: jailed 2026-11-16 (live receipts above) + reboot
+  survival 2026-11-16 13:41 boot (receipts above).
 - [x] onestop → onestart cycle cleans up the jail cell (no "already
       exists" on restart).
 
