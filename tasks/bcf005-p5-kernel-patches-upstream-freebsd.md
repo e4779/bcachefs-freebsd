@@ -1,7 +1,8 @@
 ---
 id: "bcf005"
 title: "P5: kernel patches fuse_io/fuse_ipc upstream to freebsd-src"
-status: in-progress
+status: completed
+completed_at: 2026-11-16
 priority: high
 effort: medium
 type: chore
@@ -51,6 +52,14 @@ Both patches live in overlay/patches/kernel/ (reproducible from 9218d0c/c426039)
 - fuse_ipc-deadline-cap.patch — PCATCH msleep was restarted with a new window on every periodic signal (shape-4 wedge: the thread never saw ETIMEDOUT)
 Path: a PR to github.com/freebsd/freebsd-src (or reviews.freebsd.org).
 Before sending: verify against current main fuse_ipc.c/fuse_io.c (our /usr/src 15.1), attach the repro/justification from the journal (shape-4, stacks from cores), the text per the opensource-contribution skill (no AI-slop, evidence-first). Check for duplicates re fuse EINTR wedges — single owner: bcf018 §6.
+
+## Completed (2026-11-15) - merge-await moved to watch
+
+All controllable deliverables shipped: patches written, tested
+(fusefs suite runtime-green), council-reviewed, published upstream
+(bug 300785 with the fix attachment; Kent heads-up #1234 with the
+patch branch). The upstream merge-await is a WATCH concern - it
+moved to the upstream-watch umbrella task (bcf036, see store).
 
 ## Acceptance Criteria
 
