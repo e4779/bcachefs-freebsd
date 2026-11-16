@@ -28,16 +28,19 @@ nothing in this card rots while it sleeps.
 Why it matters: the prod kernel carries our experimental inverse fuse_io patch (bcf005
 chain, deployed into /boot/kernel). A panic under it is currently diagnosed blind — no
 dumpdev existed at task-writing time (zvol swap rejected via DIOCSKERNELDUMP; file-system
-dumps impossible per dumpon(8); no free real partitions; RAM 31GB ⇒ full dump ≥31GB). A dump
-on disk therefore implies the owner has since provisioned a real dumpdev (dedicated ≥32GB
-stick or a carved partition — owner's separate hardware track, OUTSIDE this store and this
-task's scope). The card works regardless of which provisioning path was taken, including
-compressed dumps (`dumpon -Z`).
+dumps impossible per dumpon(8); no free real partitions; RAM 61GB ⇒ full dump ≥61GB). A dump
+on disk therefore implies the owner has since provisioned a real dumpdev (dedicated 57GB
+stick, provisioned 2026-11-16 with dumpon -Z compressed - a full uncompressed dump of
+61GB RAM does NOT fit 57GB; truncated dumps are possible if compression under-delivers).
+The card works regardless; on activation, check info.N for the DUMP TIMES/X字节 counter
+vs the device size - truncation is a first-class provenance fact, not a footnote.
 
 **Panic-time truth comes from the dump, not from this card.** Derive the kernel version,
 module identity, and build ids from `info.N` / `core.txt.N` and the kgdb banner. Snapshot at
 writing time (2026-11-16, provenance only — may be stale by activation): kernel
-15.1-RELEASE-p6; inverse fuse_io sha c23977d4 deployed 2026-11-14. Experimental sides that
+15.1-RELEASE-p6; inverse fuse_io sha c23977d4 deployed 2026-11-14; RAM 61GB (corrected
+2026-11-16 - the task brief carried a wrong 31GB figure, caught when the dumpdev stick
+turned out too small for uncompressed dumps). Experimental sides that
 could own a panic: kernel-side bcf005 (fuse_io/fuse_ipc), userland FUSE daemon side
 bcf032/bcf034 (070 SIGURG reader-kick).
 
