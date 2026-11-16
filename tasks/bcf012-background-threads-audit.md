@@ -1,12 +1,13 @@
 ---
 id: "bcf012"
 title: "Background threads audit tail: reconcile park conditions"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: []
 tags: [port]
 created_at: 2026-11-13
+completed_at: 2026-11-17
 context: [docs/f3-runbook.org, tools/fs/data/reconcile/plan.rs, tools/fs/data/reconcile/needs_reconcile.rs, tasks/bcf021-pool-health-monitoring.md, tasks/bcf025-cron-usr1-gonogo.md, tasks/bcf030-poolwatch-rwpend-alert.md]
 ---
 
@@ -36,8 +37,23 @@ The audit is closed: the threads start and run; drainage confirmed live (SIGUSR1
 
 ## Acceptance Criteria
 
-- [ ] A park-condition map in docs/notes (condition → file/line → status).
-- [ ] One park removed with a patch or documented as an invariant.
+- [x] A park-condition map in docs/notes (condition → file/line → status).
+  DONE 2026-11-17: docs/notes/20a-reconcile-park-map.md — TL;DR verdict,
+  condition table (class → code → status → confirmation), evidence chronology
+  (11-06 → 11-17), tail arithmetic + USR1 probe, fix options. Assembled by a
+  researcher child from tmp/research/bcf012-* (5 research runs) + orchestrator
+  corrections.
+- [x] One park removed with a patch or documented as an invariant.
+  DOCUMENTED AS INVARIANT 2026-11-17: the sticky tail (entire btree, 12.47M
+  sectors) parks by configuration invariant — metadata_replicas=2 on a
+  2-device pool with metadata_target=none (fallback → foreground nvme; the
+  hdd replica is off-target forever; improves_placement=false). Watermark
+  trigger class falsified live (USR1 probe, ops 7aca4d1: tgt-limbo 1:1 into
+  pend, zero drained). Upstream carries the same invariant (no freed-space
+  event in C; 1437 commits didn't touch the mechanics). Config fix B
+  (metadata_target = nvme+hdd group) approved by owner 2026-11-16;
+  application = ops act at the next planned bounce (feasibility/command
+  plan in tmp/research/bcf012-fix-b-command-plan.md, child in flight).
 
 ## Findings (actualization 2026-11-16)
 
