@@ -1,7 +1,7 @@
 ---
 id: "bcf016"
 title: "Thread on the FreeBSD forums: bcachefs-vm bridge + native FUSE port (project announcement)"
-status: in-progress
+status: completed
 priority: medium
 effort: medium
 type: docs
@@ -9,6 +9,7 @@ tags: [upstream, announcement]
 dependencies: ["bcf005", "bcf014"]
 created_at: 2026-11-13
 context: [docs/f3-runbook.org, docs/00-status.md]
+completed_at: 2026-11-16
 ---
 
 # Thread on the FreeBSD forums: bcachefs-vm + native FUSE port
@@ -31,9 +32,16 @@ Corpus: docs/notes/upstream-corpus-2026-11-13/ + topic freebsd-ai-policy-status-
 2. The choice of a forum section ( ports? / storage? ), a draft in docs/ for owner review BEFORE publication.
 3. Publication by the owner; the thread link — into the repo README.
 
+## POSTED — LIVE (2026-11-15, approved same day)
+
+- Thread: https://forums.freebsd.org/threads/running-a-bcachefs-pool-on-freebsd-a-vm-bridge-and-a-fuse-daemon-port.104370/
+- Секция: Storage (48), префикс «Other» (её дефолтный).
+- Task COMPLETE: DoD закрыт (тред опубликован, линк в карточке и в README).
+
 ## POSTED (2026-11-15, pending moderation)
 
-- Куда: forums.freebsd.org, секция **Porting New Software (22)**. Аккаунт свежий →
+- Куда: forums.freebsd.org, секция **Storage (48)** (решение владельца при
+  постинге 2026-11-15: тема про storage, не про портинг). Аккаунт свежий →
   пост ждёт премодерации. Текст: docs/notes/draft-bcf016-forum-post.md (v4 + правки
   владельца при постинге: короткие линк-лейблы, «Real performance feels not
   native, but enough.», closer «Open for discussion.»).

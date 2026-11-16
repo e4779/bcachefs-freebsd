@@ -2,6 +2,13 @@
 
 Native userspace access to [bcachefs](https://bcachefs.org/) filesystems on FreeBSD: a port of [bcachefs-tools](https://github.com/koverstreet/bcachefs-tools) with its FUSE frontend, built and running on FreeBSD 15.x.
 
+## Community
+
+- FreeBSD Forums thread (2026-11-15): [Running a bcachefs pool on FreeBSD: a VM bridge and a FUSE daemon port](https://forums.freebsd.org/threads/running-a-bcachefs-pool-on-freebsd-a-vm-bridge-and-a-fuse-daemon-port.104370/)
+- Bridge comparison (NFSv4 vs 9p vs sshfs, measured): [gist](https://gist.github.com/e4779/4b6f2629e1e8bd733f8ae784a0b9233a)
+- fusefs write-timeout bug: [bug 300785](https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=300785) (fix branch + tests linked)
+- fuser reader-kick: [koverstreet/bcachefs-tools#1234](https://github.com/koverstreet/bcachefs-tools/issues/1234)
+
 ## Status (2026-11-03)
 
 **Sprint A complete — all acceptance gates passed:**
