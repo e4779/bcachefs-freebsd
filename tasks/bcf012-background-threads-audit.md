@@ -46,19 +46,41 @@ The audit is closed: the threads start and run; drainage confirmed live (SIGUSR1
    parking got a typed, traced reason enum upstream (`plan.rs:72`). The card's
    original "needs_reconcile.rs updatereconcileopts, plan.rs parks_on" is
    confirmed current.
-2. LIVE prod evidence (ring, daemon 3325, 2026-11-16 ~08:30): the backlog
-   regrows under load — rw_pend = 12,262,912 sectors (~5.9 GB) and tgt
-   = 205,312, vs ZERO on the fresh daemon 2026-11-14. Regrowth over ~2 days
-   of normal load; the bcf030 alert threshold (10M sectors) is effectively
-   breached right now — that stopgap earned its keep.
+2. CORRECTED 2026-11-16 (skeptic audit + orchestrator spot-check): the earlier
+   "backlog regrows 0 -> 12.2M" claim here was a MEASUREMENT ARTIFACT — the
+   zero-pend samples of 2026-11-14 12:17-15:06 belong to four freshly created
+   TEST filesystems (uuids 48b5471a/5bab6da4/daa79144/a955a331, 671 samples),
+   not the pool; and siginfo "rw_pend=0/12206080" is used/total. Pool truth:
+   9017 ring samples, pend min 10,843,648 / max 12,459,520 — a STICKY floor
+   since 2026-11-07 (the undrained tail of the 144M drain), conserved across
+   remounts (pending bits live in the btree; journaled scan cookie). Slow
+   creep +1.4M over 9d = dev1 leaving-limbo drip (H2), not load-driven bulk.
 3. The "17.2G io-clock WRITE wait" freeze from the Source facts is visible
    live: reconcile_status = waiting, io wait duration 17.2G / remaining
    10.8G, duration waited 8h, backtrace = Copygc::sleep → io_clock::wait_until
-   (reconcile::work::wait). Class (c) above is not historical — it holds the
-   thread right now.
-4. Monitoring cluster wiring (2026-11-14, commits 78fc141/8e3cd7f): this task
+   (reconcile::work::wait). Mechanism (Explore): wait() deadline =
+   capacity>>6 WRITE sectors of the smaller RW disk (~128 GiB for 4 TB);
+   the WRITE clock ticks only from write paths, so read-heavy stretches
+   sleep without limit. This gate is the enabler of zero drain between
+   kick windows, not the backlog creator.
+4. Upstream reality (C reference + staleness check, 2026-11-16): the wakeup
+   event matrix is ported without gaps (full C-vs-Rust table in
+   tmp/research/bcf012-upstream-gap.md) — and C ITSELF has NO freed-space
+   event: pending scan is requested only on topology/config/opt changes,
+   recovery boundaries, sysfs, power. Kent's own comment plan.rs:313-315:
+   "nothing retries the pending list... the configuration has to change
+   first" — an UPSTREAM INVARIANT, not a port defect. Upstream moved 1437
+   commits past our base (16 days, Kent's solo Rust-ification sprint) with
+   the three bcf012 mechanics byte-for-byte unchanged. Research artifacts:
+   tmp/research/bcf012-{park-map-draft,upstream-gap,hypotheses,
+   upstream-staleness}.md (raw, pre-correction).
+5. Monitoring cluster wiring (2026-11-14, commits 78fc141/8e3cd7f): this task
    feeds bcf021 (landscape verdict consumes the park map), bcf030 (stopgap
    alert), bcf025 (reactive GO/NO-GO). Closing bcf012 likely retires bcf025.
+   OPEN PROBE (needs owner go, one prod action): a single manual USR1 kick —
+   if pend drains below the 10.84M floor, the watermark patch is the fix;
+   if it reparks to the floor, the tail is truly ENOSPC-stuck (target/placement
+   config) and the fix is config-side, not a trigger.
 
 ## Source
 
