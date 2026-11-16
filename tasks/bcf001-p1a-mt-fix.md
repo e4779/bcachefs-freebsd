@@ -1,12 +1,13 @@
 ---
 id: "bcf001"
 title: "P1a: MT wedge fix — 8 fuser threads"
-status: in-progress
+status: completed
 priority: high
 effort: large
 dependencies: []
 tags: [port, wedge]
 created_at: 2026-11-13
+completed_at: 2026-11-16
 context: [docs/f3-runbook.org, tools/src/commands/fusemount.rs, tools/fuser-vendored/src/session.rs, tasks/bcf002-p2-service-return.md]
 ---
 
@@ -47,10 +48,10 @@ Build — ONLY in the orchestrator slot (AGENTS rule).
 
 ## Acceptance Criteria
 
-- [ ] Acid test qbt init: 3 consecutive runs without a wedge.
-  BLOCKED outside bcf001 scope: the residual wedge is the kernel class (bcf023 verdict),
-  not reply-path narrowness. Proposal: move this AC to bcf002 (qbt return proves it
-  in the window where it matters). Owner decision pending.
+- [x] Acid test qbt init: 3 consecutive runs without a wedge.
+  MOVED to bcf002 by owner decision (variant A, 2026-11-16): the residual wedge is the
+  kernel class (bcf023 verdict), not reply-path narrowness; the 3-run series is only
+  meaningful in the qbt-return window, which bcf002 owns. bcf002 carries it as an AC.
 - [x] Prod 24h: zero wedge incidents in poolwatch.
   VERIFIED 2026-11-16: ~9 days, zero wedge-class events (receipts in Tasks above).
 - [x] The deadline layer (watchdog/heartbeat) is NOT here — it lives in bcf022 (explicit boundary).
@@ -65,11 +66,10 @@ Build — ONLY in the orchestrator slot (AGENTS rule).
    bcf002 return plan.
 3. Unblocks on close: bcf002, bcf003, bcf022, bcf024.
 
-## Owner decision (open)
+## Owner decision
 
-Close bcf001 with AC1 moved to bcf002, or keep open until the 3x acid test runs on the
-test pool first (needs a test-pool qbt harness — vn image + qbt config copy; no scripted
-harness exists yet).
+DECIDED 2026-11-16 (owner, variant A): close bcf001 with AC1 moved to bcf002;
+no test-pool acid harness in this scope.
 
 ## Source
 
