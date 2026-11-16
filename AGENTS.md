@@ -160,8 +160,11 @@ flowchart LR
 
 ## Personas
 
-Project-local (`.pi/agents/`, in git): `task-writer`,
-`work-verifier`. Universal by doctrine — domain expertise enters
+Project-local (`.pi/agents/`, in git): `work-verifier`.
+`task-writer` moved to user level (`~/.pi/agent/agents/`) 2026-11-16 —
+owner wants taskmd drafting in every project (homelab included);
+profile is project-agnostic (paths come from `<project>/tasks/AGENTS.md`).
+Universal by doctrine — domain expertise enters
 through task context, not through narrow personas. User-level
 (~/.pi/agent/agents/): researcher / skeptic / shell-expert etc. (ex-script-kiddie; rust-coder pruned 2026-11-15 — Rust work goes to the BASE agent on glm-5.3 :max with a line-level spec + work-verifier)
 are generic; the owner is pruning narrow ones.
